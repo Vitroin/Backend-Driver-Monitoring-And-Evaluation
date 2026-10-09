@@ -1,4 +1,5 @@
 {
+  "extends": "./tsconfig.paths.json",
   "compilerOptions": {
     "module": "nodenext",
     "moduleResolution": "nodenext",
@@ -11,12 +12,14 @@
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
     "target": "ES2023",
+    "types": ["vitest/globals", "node"],
     "sourceMap": true,
     "outDir": "./dist",
     "incremental": true,
     "skipLibCheck": true,
     "strict": true,
     "strictPropertyInitialization": false,
-    "types": ["vitest/globals", "node"]
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": false,
   }
 }

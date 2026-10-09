@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "@modules": ["./src/modules/index"],
+      "@modules/*": ["./src/modules/*"],
+
+      "@shared": ["./src/shared/index"],
+      "@shared/*": ["./src/shared/*"],
+      
+      "@database": ["./src/database/index"],
+      "@database/*": ["./src/database/*"],
+
+      "@config": ["./src/config/index"],
+      "@config/*": ["./src/config/*"],
+
+      "@common": ["./src/common/index"],
+      "@common/*": ["./src/common/*"],
+
+      "@infrastructure": ["./src/infrastructure/index"],
+      "@infrastructure/*": ["./src/infrastructure/*"],
+
+      "@Core": ["./src/core/index"],
+      "@Core/*": ["./src/core/*"]
+    }
+  }
+}

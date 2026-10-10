@@ -1,0 +1,1 @@
+export const OTP_TTL = 10 * 60 * 1000; // 10 minutes, in milliseconds

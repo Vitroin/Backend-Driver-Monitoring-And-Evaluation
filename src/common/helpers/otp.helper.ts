@@ -1,3 +1,3 @@
-import { randomInt } from 'node:crypto';
+import * as crypto from 'node:crypto';
 
-export const generateOtpCode = (): string => randomInt(100000, 1000000).toString();
+export const generateOtpCode = (): string => crypto.randomInt(100000, 1000000).toString();

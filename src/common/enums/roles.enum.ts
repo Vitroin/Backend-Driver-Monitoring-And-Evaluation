@@ -1,5 +1,5 @@
 export enum Roles{
-  ADMINSTRATOR = 'administrator',
+  ADMINISTRATOR = 'administrator',
   DRIVER = 'driver',
   FLEET_MANAGER = 'fleet_manager',
   FLEET_ANALYST = 'fleet_analyst',

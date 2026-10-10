@@ -1,6 +1,4 @@
 export enum ConfigNames {
-  DDB_PORT = 'database.port',
-  DB_PASSWORD = 'database.password',
   DB_URL = 'database.url',
 
   CLOUDINARY_API_KEY = 'cloudinary.apiKey',

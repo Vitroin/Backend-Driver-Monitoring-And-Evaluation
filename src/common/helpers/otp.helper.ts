@@ -1,3 +1,3 @@
-export const generateOtpCode = () => {
-  return Math.ceil(Math.random() * 9999 + 10000) as unknown as string;
-};
+import { randomInt } from 'node:crypto';
+
+export const generateOtpCode = (): string => randomInt(100000, 1000000).toString();

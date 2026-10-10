@@ -3,7 +3,6 @@ import { z } from 'zod';
 export const environmentVariablesValidationSchema = z.object({
   PORT: z.coerce.number().default(3000),
 
-  DB_PORT: z.coerce.number().default(5432),
   DB_URL: z.string().nonempty({ message: 'DB_URL is required' }),
 
   CLOUDINARY_API_KEY: z.string().nonempty({ message: 'CLOUDINARY_API_KEY is required' }),

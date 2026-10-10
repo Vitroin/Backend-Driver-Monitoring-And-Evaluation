@@ -20,7 +20,10 @@
       "@infrastructure/*": ["./src/infrastructure/*"],
 
       "@Core": ["./src/core/index"],
-      "@Core/*": ["./src/core/*"]
+      "@Core/*": ["./src/core/*"],
+
+      "@Cache": ["./src/infrastructure/cache/index"],
+      "@Cache/*": ["./src/infrastructure/cache/*"]
     }
   }
 }

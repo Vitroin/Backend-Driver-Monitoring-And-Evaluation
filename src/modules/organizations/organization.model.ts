@@ -15,7 +15,7 @@ export class Organization {
 
 
   @Prop({ type: String, enum: OrganizationTypes })
-  orgranizationType: OrganizationTypes;
+  organizationType: OrganizationTypes;
 }
 
 export const OrganizationSchema = SchemaFactory.createForClass(Organization);

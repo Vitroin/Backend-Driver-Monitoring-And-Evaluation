@@ -1,26 +1,35 @@
 import { Injectable } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { UsersRepository } from './users.repository';
+import { CreateUserDto } from '@modules/auth/dtos/create-user.dto';
+import { UsersFactory } from './users.factory';
+import { Types } from 'mongoose';
 
 @Injectable()
 export class UsersService {
-  create(createUserDto: CreateUserDto) {
-    return 'This action adds a new user';
+  constructor(
+    readonly usersRepository: UsersRepository,
+    readonly usersFactory: UsersFactory,
+  ) {}
+
+  async findByUsername(username: string) {
+    const user = await this.usersRepository.findOne({ username });
+    return user;
   }
 
-  findAll() {
-    return `This action returns all users`;
+  async findByEmail(email: string) {
+    const user = await this.usersRepository.findOne({ email });
+    return user;
   }
-
-  findOne(id: number) {
-    return `This action returns a #${id} user`;
+  
+  async findByEmailInOrganization(email: string, organizationId: string) {
+    return this.usersRepository.findOne({
+      email: email.toLowerCase(),
+      organization: new Types.ObjectId(organizationId),
+    });
   }
-
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} user`;
+  
+  async createUser(dto: CreateUserDto, hashedPassword: string) {
+    const user = this.usersFactory.createUser(dto, hashedPassword);
+    return this.usersRepository.create(user);
   }
 }

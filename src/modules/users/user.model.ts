@@ -22,8 +22,12 @@ export class User {
   @Prop({ required: true })
   age: number;
 
+  @Prop({ required: true })
+  gender: string;
+
+  
   @Prop({ type: Types.ObjectId, ref: 'Organization' })
-  orgranization: Types.ObjectId;
+  organization: Types.ObjectId;
 
   @Prop({ type: String, enum: Roles, required: true })
   role: Roles;

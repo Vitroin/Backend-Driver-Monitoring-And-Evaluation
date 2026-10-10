@@ -1,0 +1,34 @@
+# Dependencies (reinstalled inside the container for Linux)
+node_modules
+
+# Build output (rebuilt inside the container)
+dist
+*.tsbuildinfo
+
+# Environment / secrets: pass with --env-file at runtime instead
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# Tests & coverage (not needed to build or run the app)
+coverage
+test
+**/*.spec.ts
+vitest.config.ts
+vitest.config.e2e.ts
+
+# Editor / OS files
+.vscode
+.idea
+*.log
+.DS_Store
+Thumbs.db
+
+# Docker files themselves
+Dockerfile
+.dockerignore
+docker-compose*.yml

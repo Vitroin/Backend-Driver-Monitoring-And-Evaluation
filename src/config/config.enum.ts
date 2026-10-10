@@ -7,8 +7,8 @@ export enum ConfigNames {
   CLOUDINARY_API_SECRET = 'cloudinary.apiSecret',
   CLOUDINARY_CLOUD_NAME = 'cloudinary.cloudName',
 
-  MAILER_USERNAME = 'mail.username',
-  MAILER_PASSWORD = 'mail.password',
+  MAILER_USERNAME = 'mailer.username',
+  MAILER_PASSWORD = 'mailer.password',
 
   JWT_SECRET = 'jwt.secret',
 

@@ -6,7 +6,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import bcrypt from 'bcrypt';
 import type { Cache } from 'cache-manager';
-import { randomBytes } from 'crypto';
+import * as crypto from 'crypto';
 import { mongo } from 'mongoose';
 import { ForgetPasswordDto } from './dtos';
 import { CreateUserDto } from './dtos/create-user.dto';
@@ -31,7 +31,7 @@ export class AuthService {
   }
 
   async createUser(dto: CreateUserDto) {
-    const password = this.generatePassword();
+    const password = crypto.randomUUID();
     const hashedPass = await bcrypt.hash(password, 10);
 
     try {
@@ -46,13 +46,6 @@ export class AuthService {
       const field = error.keyPattern?.username ? 'Username' : 'Email';
       throw new ConflictException(`${field} already exists`);
     }
-  }
-
-  private generatePassword(): string {
-    const password = randomBytes(9).toString('base64url');
-    return /[A-Z]/.test(password) && /[a-z]/.test(password) && /[0-9]/.test(password)
-      ? password
-      : this.generatePassword();
   }
 
   async forgetPassword(dto: ForgetPasswordDto) {

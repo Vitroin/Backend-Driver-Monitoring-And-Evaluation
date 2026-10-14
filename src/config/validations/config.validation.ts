@@ -16,4 +16,12 @@ export const environmentVariablesValidationSchema = z.object({
 
   REDIS_HOST: z.string().nonempty({ message: 'REDIS_HOST is required' }),
   REDIS_PORT: z.coerce.number().default(6379),
+
+  OTP_EXPIRY_MINUTES: z.coerce.number().default(5),
+  OTP_SECRET: z.string().nonempty({ message: 'OTP_SECRET is required' }),
+
+  JWT_ACCESS_TOKEN_TTL_MINUTES: z.coerce.number().default(15),
+  JWT_REFRESH_TOKEN_TTL_DAYS: z.coerce.number().default(7),
+  
+  APP_CLIENT_URL: z.url({ message: 'APP_CLIENT_URL is required' }),
 });

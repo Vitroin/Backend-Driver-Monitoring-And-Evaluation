@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { User } from './user.model';
-import { CreateUserDto } from '@modules/auth/dtos/create-user.dto';
+import { CreateUserDto } from './create-user.dto';
 
 @Injectable()
 export class UsersFactory {
@@ -9,7 +9,7 @@ export class UsersFactory {
     const user = new User();
     user.username = dto.username;
     user.email = dto.email;
-    user.password = hashedPassword;
+    user.passwordHash = hashedPassword;
     user.age = dto.age;
     user.gender = dto.gender;
     user.role = dto.role;

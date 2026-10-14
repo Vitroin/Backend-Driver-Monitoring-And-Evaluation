@@ -1,4 +1,5 @@
-import { Roles } from '@common/enums/roles.enum';
+import { UserRole } from '@common/enums/user_roles.enum';
+import { UserStatus } from '@common/enums/user_status.enum';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
 
@@ -14,10 +15,13 @@ export class User {
   username: string;
 
   @Prop({ required: true })
-  password: string;
+  passwordHash: string;
 
   @Prop({ required: true, lowercase: true })
   email: string;
+
+  @Prop({ type: Types.ObjectId, required: true, default: () => new Types.ObjectId() })
+  securityStamp: Types.ObjectId;
 
   @Prop({ required: true })
   age: number;
@@ -25,12 +29,17 @@ export class User {
   @Prop({ required: true })
   gender: string;
 
-  
+  @Prop({ required: true, type: String, enum: UserStatus, default: UserStatus.WAITING_FOR_ACTIVATION })
+  status: UserStatus;
+
   @Prop({ type: Types.ObjectId, ref: 'Organization' })
   organization: Types.ObjectId;
 
-  @Prop({ type: String, enum: Roles, required: true })
-  role: Roles;
+  @Prop({ type: String, enum: UserRole, required: true })
+  role: UserRole;
+
+  @Prop({ default: true })
+  mustChangePassword: boolean;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

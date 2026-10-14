@@ -1,8 +1,10 @@
+import { usernameSchema } from '@common/types';
 import { z } from 'zod';
+import { existingPasswordSchema } from './password.schema';
 
-export const LoginSchema = z.object({
-  username: z.string({ message: 'Username is required' }).toLowerCase().min(3, { message: 'Username must be at least 3 characters long' }),
-  password: z.string({ message: 'Password is required' }).min(8, { message: 'Password must be at least 8 characters long' }),
+export const loginSchema = z.strictObject({
+  username: usernameSchema,
+  password: existingPasswordSchema.meta({ description: 'User password', example: 'MySecurePassword123' }),
 });
 
-export type LoginDto = z.infer<typeof LoginSchema>;
+export type LoginDto = z.infer<typeof loginSchema>;

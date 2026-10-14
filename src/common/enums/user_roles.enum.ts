@@ -1,5 +1,5 @@
-export enum Roles{
-  ADMINISTRATOR = 'administrator',
+export enum UserRole {
+  SUPER_ADMIN = 'super_admin',
   DRIVER = 'driver',
   FLEET_MANAGER = 'fleet_manager',
   FLEET_ANALYST = 'fleet_analyst',

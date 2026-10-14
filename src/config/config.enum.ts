@@ -12,4 +12,13 @@ export enum ConfigNames {
 
   REDIS_HOST = 'redis.host',
   REDIS_PORT = 'redis.port',
+
+  APP_CLIENT_URL = 'app.clientUrl',
+  APP_CLIENT_PORT = 'app.clientPort',
+
+  OTP_EXPIRY_MINUTES = 'otp.expiryMinutes',
+  OTP_SECRET = 'otp.secret',
+
+  JWT_ACCESS_TOKEN_TTL_MINUTES = 'jwt.accessTokenTtlMinutes',
+  JWT_REFRESH_TOKEN_TTL_DAYS = 'jwt.refreshTokenTtlDays',
 }

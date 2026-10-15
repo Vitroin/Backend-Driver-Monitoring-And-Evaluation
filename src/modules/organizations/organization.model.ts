@@ -1,9 +1,8 @@
-import { OrganizationTypes } from '@common/enums/organizations.enum';
+import { OrganizationTypes } from '@modules/organizations/organizations.enum';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Types } from 'mongoose'; 
+import { Types } from 'mongoose';
 @Schema({ timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } })
 export class Organization {
-
   @Prop({ required: true })
   name: string;
 
@@ -12,7 +11,6 @@ export class Organization {
 
   @Prop({ type: Types.ObjectId, ref: 'User', default: null })
   organizationOwner: Types.ObjectId | null;
-
 
   @Prop({ type: String, enum: OrganizationTypes })
   organizationType: OrganizationTypes;

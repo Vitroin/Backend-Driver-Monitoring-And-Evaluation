@@ -1,5 +1,5 @@
-import { UserRole } from '@common/enums/user_roles.enum';
-import { UserStatus } from '@common/enums/user_status.enum';
+import { UserRole } from '@common/enums/user/user_roles.enum';
+import { UserStatus } from '@common/enums/user/user_status.enum';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
 

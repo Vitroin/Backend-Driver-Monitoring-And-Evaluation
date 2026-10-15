@@ -8,6 +8,7 @@ export class UsersFactory {
   createUser(dto: CreateUserDto, hashedPassword: string): User {
     const user = new User();
     user.username = dto.username;
+    user.fullName = dto.fullName;
     user.email = dto.email;
     user.passwordHash = hashedPassword;
     user.age = dto.age;

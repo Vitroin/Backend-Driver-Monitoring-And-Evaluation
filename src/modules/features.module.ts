@@ -9,8 +9,10 @@ import { IncidentsModule } from './incidents/incidents.module';
 const modules = [
   UsersModule,
   OrganizationsModule,
-  AuthModule
-  
+  AuthModule,
+  DriversModule,
+  TripsModule,
+  IncidentsModule
 ];
 
 @Module({

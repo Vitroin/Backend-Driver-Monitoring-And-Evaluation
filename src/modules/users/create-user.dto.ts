@@ -5,6 +5,11 @@ import { z } from 'zod';
 export const CreateUserSchema = z.strictObject({
   username: usernameSchema,
   email: emailSchema,
+  fullName: z
+    .string()
+    .trim()
+    .min(2, { message: 'Full name is too short' })
+    .max(100, { message: 'Full name is too long' }),
   gender: z.enum(['male', 'female'], { message: 'Gender must be male or female' }),
   age: z
     .number({ message: 'Age is required and must be a number' })

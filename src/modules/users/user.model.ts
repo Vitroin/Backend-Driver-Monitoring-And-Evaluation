@@ -1,3 +1,4 @@
+import { Language } from '@common/enums';
 import { UserRole } from '@common/enums/user/user_roles.enum';
 import { UserStatus } from '@common/enums/user/user_status.enum';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
@@ -8,11 +9,24 @@ export type UserDocument = HydratedDocument<User>;
 @Schema({
   timestamps: true,
   toJSON: { virtuals: true },
+  discriminatorKey: 'role',
   toObject: { virtuals: true },
 })
 export class User {
   @Prop({ required: true, unique: true, index: true, lowercase: true })
   username: string;
+  
+  // "How your name appears to evaluators and in reports" (Youssef Nabil, the YN avatar)
+  @Prop({ required: true, trim: true })
+  fullName: string;
+
+  // Stored on the server because the in-vehicle unit uses it for voice prompts
+  @Prop({ type: String, enum: Language, default: Language.ENGLISH })
+  language: Language;
+
+  // Set by "Request deletion"; an admin or a scheduled job then deletes the account and its data
+  @Prop({ type: Date, default: null })
+  deletionRequestedAt: Date | null;
 
   @Prop({ required: true })
   passwordHash: string;

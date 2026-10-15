@@ -33,6 +33,13 @@ export class Incident {
   @Prop({ required: true })
   occurredAt: Date;
 
+  // Short event clip on Cloudinary; publicId is what you need to delete it after 90 days
+  @Prop({ type: String, default: null })
+  clipUrl: string | null;
+
+  @Prop({ type: String, default: null })
+  clipPublicId: string | null;
+  
   // Stored as a positive number; the report shows it as -5.6
   @Prop({ required: true, min: 0 })
   pointsDeducted: number;

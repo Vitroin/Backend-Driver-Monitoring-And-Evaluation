@@ -2,12 +2,11 @@ import mongoose from 'mongoose';
 import * as argon2 from 'argon2';
 
 async function seedSuperAdmin() {
-  const [username, email, password] = process.argv.slice(2);
-  if (!username || !email || !password) {
-    console.error('Usage: bun src/database/scripts/seed-super-admin.ts <username> <email> <password>');
+  const [username, email, password, fullName] = process.argv.slice(2);
+  if (!username || !email || !password || !fullName) {
+    console.error('Usage: bun src/database/scripts/seed-super-admin.ts <username> <email> <password> "<full name>"');
     process.exit(1);
   }
-
   await mongoose.connect(process.env.DB_URL!);
   const users = mongoose.connection.collection('users');
 
@@ -16,6 +15,7 @@ async function seedSuperAdmin() {
   } else {
     await users.insertOne({
       username: username.trim().toLowerCase(),
+      fullName: fullName.trim(),
       email: email.trim().toLowerCase(),
       passwordHash: await argon2.hash(password),
       securityStamp: new mongoose.Types.ObjectId(),

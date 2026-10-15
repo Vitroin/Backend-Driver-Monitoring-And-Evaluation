@@ -2,7 +2,7 @@ import { IncidentSeverity, IncidentType } from '@common/enums';
 import { Trip } from '@modules/trips/trips.model';
 import { User } from '@modules/users/user.model';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import mongoose, { HydratedDocument, Types } from 'mongoose';
 
 export type IncidentDocument = HydratedDocument<Incident>;
 
@@ -16,11 +16,11 @@ export type IncidentDocument = HydratedDocument<Incident>;
   toObject: { virtuals: true },
 })
 export class Incident {
-  @Prop({ type: Types.ObjectId, ref: Trip.name, required: true })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: Trip.name, required: true })
   trip: Types.ObjectId;
 
   // Copied from the trip so a driver's incidents can be queried without going through their trips
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: User.name, required: true })
   driver: Types.ObjectId;
 
   @Prop({ type: String, enum: IncidentType, required: true })
@@ -39,7 +39,7 @@ export class Incident {
 
   @Prop({ type: String, default: null })
   clipPublicId: string | null;
-  
+
   // Stored as a positive number; the report shows it as -5.6
   @Prop({ required: true, min: 0 })
   pointsDeducted: number;

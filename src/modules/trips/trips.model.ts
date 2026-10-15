@@ -1,7 +1,7 @@
 import { Organization } from '@modules/organizations/organization.model';
 import { User } from '@modules/users/user.model';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import mongoose, { HydratedDocument, Types } from 'mongoose';
 import { TripRisk, TripStatus } from '@common/enums';
 export type TripDocument = HydratedDocument<Trip>;
 
@@ -23,11 +23,11 @@ export class Trip {
   @Prop({ required: true, unique: true })
   code: string;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: User.name, required: true })
   driver: Types.ObjectId;
 
   // Copied from the driver so an organization's trips can be listed with one query
-  @Prop({ type: Types.ObjectId, ref: Organization.name, required: true })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: Organization.name, required: true })
   organization: Types.ObjectId;
 
   @Prop({ required: true })

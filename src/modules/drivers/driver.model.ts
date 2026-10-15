@@ -1,6 +1,6 @@
 import { User } from '@modules/users/user.model';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import mongoose, { HydratedDocument, Types } from 'mongoose';
 
 // A driver document is a User with role "driver" plus the fields below
 export type DriverDocument = HydratedDocument<User & Driver>;
@@ -12,13 +12,16 @@ export type DriverDocument = HydratedDocument<User & Driver>;
  * Schema options (timestamps, toJSON...) come from the User schema.
  */
 @Schema()
-export class Driver {
+export class Driver extends User {
   @Prop({ type: String, default: null })
   licenseNumber: string | null;
 
   // The driving-school instructor who evaluates this driver
-  @Prop({ type: Types.ObjectId, ref: User.name, default: null })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: User.name, default: null })
   instructor: Types.ObjectId | null;
 }
 
 export const DriverSchema = SchemaFactory.createForClass(Driver);
+
+// `role` is the discriminator key; Mongoose sets it to 'driver' itself and refuses a discriminator that defines it
+DriverSchema.remove('role');

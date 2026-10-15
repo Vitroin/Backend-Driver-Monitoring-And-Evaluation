@@ -41,10 +41,3 @@ export type LoginDataDto = z.infer<typeof loginDataSchema>;
 
 export const changePasswordDataSchema = z.object({ tokens: tokensResponseSchema });
 
-export interface MessageResponseDto {
-  message: string;
-}
-
-export interface DataResponseDto<T> extends MessageResponseDto {
-  data: T;
-}

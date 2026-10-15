@@ -1,9 +1,12 @@
+import { TripStatus } from '@common/enums';
 import { BaseRepository } from '@common/repositories';
 import { Injectable } from '@nestjs/common';
-import { Trip, TripDocument } from './trips.model';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { TripStatus } from '@common/enums';
+import type { ScoredTrip } from './trip-scoring';
+import { Trip, TripDocument } from './trips.model';
+
+export type ScoredTripRow = ScoredTrip & { _id: Types.ObjectId; code: string };
 
 @Injectable()
 export class TripsRepository extends BaseRepository<Trip> {
@@ -16,6 +19,7 @@ export class TripsRepository extends BaseRepository<Trip> {
     driverId: string | Types.ObjectId,
   ): Promise<{ trips: number; distanceKm: number; durationSeconds: number }> {
     const [result] = await this.tripModel.aggregate<{ trips: number; distanceKm: number; durationSeconds: number }>([
+      // aggregate() doesn't turn string ids into ObjectIds like find() does, so convert it here
       { $match: { driver: new Types.ObjectId(driverId), status: TripStatus.COMPLETED } },
       {
         $group: {
@@ -30,22 +34,25 @@ export class TripsRepository extends BaseRepository<Trip> {
     return result ?? { trips: 0, distanceKm: 0, durationSeconds: 0 };
   }
 
-  // Scores of the driver's latest completed trips, newest first
-  async getRecentScores(driverId: string | Types.ObjectId, limit: number): Promise<number[]> {
-    const trips = await this.tripModel
-      .find({ driver: new Types.ObjectId(driverId), status: TripStatus.COMPLETED, score: { $ne: null } }, { score: 1 })
+  // The driver's scored, completed trips, newest first.
+  // `before` keeps only trips that started earlier; `limit` keeps only the newest ones.
+  findScoredTrips(driverId: string | Types.ObjectId, { before, limit = 0 }: { before?: Date; limit?: number } = {}) {
+    return this.tripModel
+      .find({
+        driver: driverId,
+        status: TripStatus.COMPLETED,
+        score: { $ne: null },
+        ...(before && { startedAt: { $lt: before } }),
+      })
       .sort({ startedAt: -1 })
-      .limit(limit)
-      .lean()
+      .limit(limit) // 0 means no limit
+      .lean<ScoredTripRow[]>()
       .exec();
-    return trips.map((trip) => trip.score as number);
   }
 
-  async findRecent(driverId: string | Types.ObjectId, limit: number): Promise<TripDocument[]> {
-    return this.tripModel
-      .find({ driver: new Types.ObjectId(driverId) })
-      .sort({ startedAt: -1 })
-      .limit(limit)
-      .exec();
+  // The driver's latest trips of any status (planned ones too), newest first.
+  // Not lean(): the trip's `risk` is a virtual, and lean() results don't have virtuals.
+  findRecent(driverId: string | Types.ObjectId, limit: number): Promise<TripDocument[]> {
+    return this.tripModel.find({ driver: driverId }).sort({ startedAt: -1 }).limit(limit).exec();
   }
 }

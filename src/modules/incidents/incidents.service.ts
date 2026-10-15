@@ -1,7 +1,9 @@
+import type { DataResponseDto } from '@common';
 import { Injectable } from '@nestjs/common';
+import { Types } from 'mongoose';
+import { IncidentDocument } from './incidents.model';
 import { IncidentsRepository } from './incidents.repository';
-import { SignificantEventDto } from './response/significant-event.response';
-import { DataResponseDto } from '@common';
+import type { SignificantEventDto } from './response/significant-event.response';
 
 // "Most significant events": the 5 incidents that cost the most points in the last 60 days
 const SIGNIFICANT_EVENTS_DAYS = 60;
@@ -17,13 +19,25 @@ export class IncidentsService {
     const incidents = await this.incidentsRepository.findMostSignificant(driverId, since, SIGNIFICANT_EVENTS_LIMIT);
     return {
       message: 'Most significant events',
-      data: incidents.map((incident) => ({
-        id: incident._id.toString(),
-        type: incident.type,
-        severity: incident.severity,
-        occurredAt: incident.occurredAt.toISOString(),
-        pointsDeducted: incident.pointsDeducted,
+      data: incidents.map(({ _id, type, severity, occurredAt, pointsDeducted }) => ({
+        id: _id.toString(),
+        type,
+        severity,
+        occurredAt: occurredAt.toISOString(),
+        pointsDeducted,
       })),
     };
+  }
+
+  // ---------- used by other modules ----------
+
+  // The incidents of these trips (the post-trip report)
+  findByTrips(tripIds: Types.ObjectId[]): Promise<IncidentDocument[]> {
+    return this.incidentsRepository.find({ trip: { $in: tripIds } });
+  }
+
+  // Every incident of the driver, newest first ("Download my data")
+  findAllByDriver(driverId: Types.ObjectId): Promise<IncidentDocument[]> {
+    return this.incidentsRepository.find({ driver: driverId }, undefined, { sort: { occurredAt: -1 } });
   }
 }

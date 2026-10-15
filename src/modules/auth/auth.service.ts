@@ -1,7 +1,7 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException, OnModuleInit, UnauthorizedException } from '@nestjs/common';
 import * as crypto from 'node:crypto';
 import { mongo } from 'mongoose';
-import type { RequestSession } from '@common';
+import type { DataResponseDto, MessageResponseDto, RequestSession } from '@common';
 import { UserRole, UserStatus } from '@common/enums';
 import { UsersService } from '@modules/users/users.service';
 import type { UserDocument } from '@modules/users/user.model';
@@ -23,7 +23,7 @@ import type {
   ResetPasswordDto,
   ValidateResetPasswordOtpDto,
 } from './dtos';
-import type { DataResponseDto, LoginDataDto, MessageResponseDto, UserResponseDto } from './response';
+import { LoginDataDto, UserResponseDto } from './response';
 
 const INVALID_OTP = 'Invalid or expired OTP. Please request a new password reset OTP.';
 

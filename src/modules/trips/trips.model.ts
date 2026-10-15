@@ -3,6 +3,9 @@ import { User } from '@modules/users/user.model';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument, Types } from 'mongoose';
 import { TripRisk, TripStatus } from '@common/enums';
+import { riskForScore } from './trip-scoring';
+
+
 export type TripDocument = HydratedDocument<Trip>;
 
 // Score thresholds for the risk badge (the "Low risk" / "High risk" lines on the score history chart)
@@ -74,12 +77,8 @@ export class Trip {
 export const TripSchema = SchemaFactory.createForClass(Trip);
 
 TripSchema.virtual('risk').get(function (this: TripDocument): TripRisk | null {
-  if (typeof this.score !== 'number') return null;
-  if (this.score >= LOW_RISK_MIN_SCORE) return TripRisk.LOW;
-  if (this.score >= MEDIUM_RISK_MIN_SCORE) return TripRisk.MEDIUM;
-  return TripRisk.HIGH;
+  return typeof this.score === 'number' ? riskForScore(this.score) : null;
 });
-
 // A driver's trips, newest first (trip list and progress page)
 TripSchema.index({ driver: 1, startedAt: -1 });
 

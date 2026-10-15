@@ -36,6 +36,7 @@ export class UsersService {
     if (!user) throw new NotFoundException('User not found');
     return securityStamp.toString();
   }
+
   async findByUsername(username: string) {
     const user = await this.usersRepository.findOne({ username });
     return user;
@@ -69,6 +70,15 @@ export class UsersService {
   /** Used by the guard and refresh: same as findById, kept separate so you can add a projection or cache later. */
   findForAuthentication(id: string) {
     return this.usersRepository.findById(id);
+  }
+
+  /** Records a deletion request. @returns false if one was already recorded (the first request's date is kept). */
+  async requestDeletion(id: string | Types.ObjectId): Promise<boolean>{
+    const user = await this.usersRepository.updateOne(
+      {_id: new Types.ObjectId(id), deletionRequestedAt: null},
+      {deletionRequestedAt: new Date()},
+    )
+    return user !== null;
   }
 
 

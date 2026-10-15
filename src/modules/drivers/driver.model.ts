@@ -2,9 +2,7 @@ import { User } from '@modules/users/user.model';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument, Types } from 'mongoose';
 
-// A driver document is a User with role "driver" plus the fields below
-export type DriverDocument = HydratedDocument<User & Driver>;
-
+export type DriverDocument = HydratedDocument<Driver>;
 /*
  * Fields only drivers have. Stored in the users collection (Mongoose discriminator on `role`),
  * so login, refresh tokens and email uniqueness work exactly like for every other user.

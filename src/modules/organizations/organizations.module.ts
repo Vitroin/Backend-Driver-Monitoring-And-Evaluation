@@ -9,5 +9,6 @@ import { OrganizationsRepository } from './organization.repository';
   imports: [MongooseModule.forFeature([{ name: Organization.name, schema: OrganizationSchema }])],
   controllers: [OrganizationsController],
   providers: [OrganizationsService, OrganizationsRepository],
+  exports: [OrganizationsService],
 })
 export class OrganizationsModule {}

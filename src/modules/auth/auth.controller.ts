@@ -14,7 +14,7 @@ import {
   resetPasswordSchema,
   validateResetPasswordOtpSchema,
 } from './dtos';
-import { changePasswordDataSchema, loginDataSchema, userResponseSchema } from './response';
+import { changePasswordDataSchema, LoginDataDto, loginDataSchema, UserResponseDto, userResponseSchema } from './response';
 import type {
   AcceptInvitationDto,
   ChangePasswordDto,
@@ -26,9 +26,8 @@ import type {
   ResetPasswordDto,
   ValidateResetPasswordOtpDto,
 } from './dtos';
-import type { DataResponseDto, LoginDataDto, MessageResponseDto, UserResponseDto } from './response';
 import { AllowedRoles, BaseResponseSchema, CurrentSession, CurrentUser, Public, idParamSchema } from '@common';
-import type { IdParam, RequestSession } from '@common';
+import type { DataResponseDto, IdParam, MessageResponseDto, RequestSession } from '@common';
 import { UserRole } from '@common/enums';
 import type { UserDocument } from '@modules/users/user.model';
 

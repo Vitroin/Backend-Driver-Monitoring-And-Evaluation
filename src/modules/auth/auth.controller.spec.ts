@@ -4,7 +4,6 @@ import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { buildUser } from '../../../test/factories/user.factory';
 
 describe('AuthController', () => {
   let controller: AuthController;

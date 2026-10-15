@@ -40,4 +40,12 @@ export class TripsRepository extends BaseRepository<Trip> {
       .exec();
     return trips.map((trip) => trip.score as number);
   }
+
+  async findRecent(driverId: string | Types.ObjectId, limit: number): Promise<TripDocument[]> {
+    return this.tripModel
+      .find({ driver: new Types.ObjectId(driverId) })
+      .sort({ startedAt: -1 })
+      .limit(limit)
+      .exec();
+  }
 }

@@ -1,11 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import type { DataResponseDto } from '@modules/auth/response';
 import { TripsRepository } from './trips.repository';
 import { LastTripScoreDto } from './response/last-trip-score.response';
-import { TripTotalsDto } from './response';
+import { RecentTripDto, TripTotalsDto } from './response';
+import { DataResponseDto } from '@common';
 
 // How many trips before the last one make up the "recent average"
 const RECENT_TRIPS = 5;
+
+// How many trips the dashboard's "Recent trips" card shows
+const RECENT_TRIPS_LIST_SIZE = 6;
 
 const roundToOneDecimal = (value: number): number => Math.round(value * 10) / 10;
 
@@ -40,4 +43,22 @@ export class TripsService {
     const totals = await this.tripsRepository.getTotals(driverId);
     return { message: 'Trip totals', data: { ...totals, distanceKm: roundToOneDecimal(totals.distanceKm) } };
   }
+
+  async getRecentTrips(driverId: string): Promise<DataResponseDto<RecentTripDto[]>> {
+    const trips = await this.tripsRepository.findRecent(driverId, RECENT_TRIPS_LIST_SIZE);
+    return {
+      message: 'Recent trips',
+      data: trips.map((trip) => ({
+        code: trip.code,
+        vehicle: trip.vehicle,
+        status: trip.status,
+        startedAt: trip.startedAt.toISOString(),
+        distanceKm: trip.distanceKm,
+        score: trip.score,
+        risk: trip.risk,
+      })),
+    };
+  }
+
+  
 }

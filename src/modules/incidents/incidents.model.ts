@@ -16,11 +16,11 @@ export type IncidentDocument = HydratedDocument<Incident>;
   toObject: { virtuals: true },
 })
 export class Incident {
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: Trip.name, required: true })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Trip', required: true })
   trip: Types.ObjectId;
 
   // Copied from the trip so a driver's incidents can be queried without going through their trips
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: User.name, required: true })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   driver: Types.ObjectId;
 
   @Prop({ type: String, enum: IncidentType, required: true })

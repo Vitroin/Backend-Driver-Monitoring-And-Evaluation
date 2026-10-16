@@ -6,6 +6,8 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "seed": "nest build && node dist/database/scripts/seed.js",
+    "seed:fresh": "nest build && node dist/database/scripts/seed.js --fresh",
     "seed:super-admin": "bun src/database/scripts/seed-super-admin.ts",
     "build": "nest build",
     "deploy": "nest deploy",
@@ -42,12 +44,14 @@
     "jsonwebtoken": "^9.0.3",
     "keyv": "^6.1.0",
     "mongoose": "^9.11.1",
+    "mongoose-autopopulate": "^1.2.1",
     "nodemailer": "^10.1.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@faker-js/faker": "^10.6.0",
     "@nestjs/cli": "^12.0.0",
     "@nestjs/mau": "^0.2.6",
     "@nestjs/schematics": "^12.0.0",

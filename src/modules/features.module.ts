@@ -5,9 +5,8 @@ import { IncidentsModule } from './incidents/incidents.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { TripsModule } from './trips/trips.module';
 import { UsersModule } from './users/users.module';
-import { PrivacyModule } from './privacy/privacy.module';
 
-const modules = [UsersModule, OrganizationsModule, AuthModule, DriversModule, TripsModule, IncidentsModule, PrivacyModule];
+const modules = [UsersModule, OrganizationsModule, AuthModule, DriversModule, TripsModule, IncidentsModule, ];
 
 @Module({
   imports: modules,

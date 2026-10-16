@@ -40,4 +40,5 @@ export class IncidentsService {
   findAllByDriver(driverId: Types.ObjectId): Promise<IncidentDocument[]> {
     return this.incidentsRepository.find({ driver: driverId }, undefined, { sort: { occurredAt: -1 } });
   }
+  
 }

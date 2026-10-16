@@ -6,6 +6,7 @@ import { average, longTermScore, riskForScore, roundToOneDecimal } from './trip-
 import { TripDocument } from './trips.model';
 import { TripsRepository } from './trips.repository';
 import { ScoreOverviewDto } from './response/score-overview.response';
+import { TripsFilterDto } from './trips_filter.dto';
 
 // "Last trip score" compares the last trip with the average of the 5 before it
 const RECENT_TRIPS = 5;
@@ -83,13 +84,21 @@ export class TripsService {
     return this.tripsRepository.findById(id);
   }
 
+  test(driverId: Types.ObjectId, dto: TripsFilterDto) {
+    console.log('driverId:', driverId)
+    console.log('dto:', dto)
+    return this.tripsRepository.filterTrips(driverId, dto);
+  }
+
   // The report's trend and recommendations: the driver's scored trips before `before`, newest first
   findPreviousScoredTrips(driverId: Types.ObjectId, before: Date, limit: number) {
     return this.tripsRepository.findScoredTrips(driverId, { before, limit });
   }
 
-  // Every trip of the driver, newest first ("Download my data")
   findAllByDriver(driverId: Types.ObjectId): Promise<TripDocument[]> {
-    return this.tripsRepository.find({ driver: driverId }, undefined, { sort: { startedAt: -1 } });
+    return this.tripsRepository.find({ driver: driverId }, { sort: { startedAt: -1 } });
   }
+
+
+  
 }

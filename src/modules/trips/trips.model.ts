@@ -4,7 +4,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument, Types } from 'mongoose';
 import { TripRisk, TripStatus } from '@common/enums';
 import { riskForScore } from './trip-scoring';
-
+import { Incident } from '@modules/incidents/incidents.model';
 
 export type TripDocument = HydratedDocument<Trip>;
 
@@ -28,6 +28,9 @@ export class Trip {
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: User.name, required: true })
   driver: Types.ObjectId;
+
+  // Virtual, populated from Incident.trip (see TripSchema.virtual below)
+  incidents?: Incident[];
 
   // Copied from the driver so an organization's trips can be listed with one query
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: Organization.name, required: true })
@@ -84,3 +87,13 @@ TripSchema.index({ driver: 1, startedAt: -1 });
 
 // All trips in an organization, newest first (analysts / instructors)
 TripSchema.index({ organization: 1, startedAt: -1 });
+
+TripSchema.virtual('incidents', {
+  ref: Incident.name,
+  localField: '_id',
+  foreignField: 'trip',
+  options: { sort: { occurredAt: 1 } },
+  autopopulate: true,
+});
+
+TripSchema.plugin(require('mongoose-autopopulate'));

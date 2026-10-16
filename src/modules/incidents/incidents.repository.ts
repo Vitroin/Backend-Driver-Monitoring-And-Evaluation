@@ -1,3 +1,4 @@
+import { IncidentType } from '@common/enums';
 import { BaseRepository } from '@common/repositories';
 import { Injectable } from '@nestjs/common';
 import { Incident } from './incidents.model';
@@ -11,10 +12,13 @@ export class IncidentsRepository extends BaseRepository<Incident> {
   }
 
   async findMostSignificant(driverId: string | Types.ObjectId, since: Date, limit: number) {
-    return this.incidentModel.find({ driver: driverId, occurredAt: { $gte: since } })
-    .sort({pointsDeducted: -1})
-    .limit(limit)
-    .lean()
-    .exec();
+    return this.incidentModel
+      .find({ driver: driverId, occurredAt: { $gte: since } })
+      .sort({ pointsDeducted: -1 })
+      .limit(limit)
+      .lean()
+      .exec();
   }
+
+
 }

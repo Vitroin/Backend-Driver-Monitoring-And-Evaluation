@@ -9,4 +9,7 @@ export class OrganizationsRepository extends BaseRepository<Organization> {
   constructor(@InjectModel(Organization.name) private readonly organizationModel: Model<Organization>) {
       super(organizationModel);
   }
+
+
+  
 }

@@ -15,7 +15,7 @@ export class Driver extends User {
   licenseNumber: string | null;
 
   // The driving-school instructor who evaluates this driver
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: User.name, default: null })
+  @Prop({ type: Types.ObjectId, ref: User.name, default: null })
   instructor: Types.ObjectId | null;
 }
 

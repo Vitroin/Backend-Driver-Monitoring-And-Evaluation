@@ -1,15 +1,11 @@
 import { UserRole } from '@common/enums';
-import { emailSchema, objectIdSchema, usernameSchema } from '@common/types';
+import { emailSchema, fullNameSchema, objectIdSchema, usernameSchema } from '@common/types';
 import { z } from 'zod';
 
 export const CreateUserSchema = z.strictObject({
   username: usernameSchema,
   email: emailSchema,
-  fullName: z
-    .string()
-    .trim()
-    .min(2, { message: 'Full name is too short' })
-    .max(100, { message: 'Full name is too long' }),
+  fullName: fullNameSchema,
   gender: z.enum(['male', 'female'], { message: 'Gender must be male or female' }),
   age: z
     .number({ message: 'Age is required and must be a number' })

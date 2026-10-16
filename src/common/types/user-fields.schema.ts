@@ -16,3 +16,11 @@ export const emailSchema = z
   .toLowerCase()
   .pipe(z.email({ message: 'Email must be a valid email address' }).max(255))
   .meta({ example: 'jane@example.com' });
+
+/** "How your name appears to evaluators and in reports". */
+export const fullNameSchema = z
+  .string({ message: 'Full name is required' })
+  .trim()
+  .min(2, { message: 'Full name is too short' })
+  .max(100, { message: 'Full name is too long' })
+  .meta({ example: 'Youssef Nabil' });

@@ -20,10 +20,10 @@ export class RefreshToken {
   @Prop({ required: true })
   expiresAt: Date;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: User.name, required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
   userId: Types.ObjectId;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, required: true })
+  @Prop({ type: Types.ObjectId, required: true })
   securityStamp: Types.ObjectId;
 
   createdAt: Date;

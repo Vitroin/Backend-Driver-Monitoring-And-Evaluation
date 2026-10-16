@@ -1,12 +1,30 @@
+import { TripRisk, TripStatus } from '@common/enums';
+import { Incident } from '@modules/incidents/incidents.model';
 import { Organization } from '@modules/organizations/organization.model';
 import { User } from '@modules/users/user.model';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { HydratedDocument, Types } from 'mongoose';
-import { TripRisk, TripStatus } from '@common/enums';
 import { riskForScore } from './trip-scoring';
-import { Incident } from '@modules/incidents/incidents.model';
 
 export type TripDocument = HydratedDocument<Trip>;
+
+@Schema()
+export class TripSpeeds {
+  time: string;
+  speed: number;
+}
+
+@Schema()
+export class TripAcclerations {
+  time: string;
+  acceleration: number;
+}
+
+@Schema()
+export class TripSteerings {
+  time: string;
+  steeringWheelAngle: number;
+}
 
 // Score thresholds for the risk badge (the "Low risk" / "High risk" lines on the score history chart)
 const LOW_RISK_MIN_SCORE = 85;
@@ -26,14 +44,14 @@ export class Trip {
   @Prop({ required: true, unique: true })
   code: string;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: User.name, required: true })
+  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
   driver: Types.ObjectId;
 
   // Virtual, populated from Incident.trip (see TripSchema.virtual below)
   incidents?: Incident[];
 
   // Copied from the driver so an organization's trips can be listed with one query
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: Organization.name, required: true })
+  @Prop({ type: Types.ObjectId, ref: Organization.name, required: true })
   organization: Types.ObjectId;
 
   @Prop({ required: true })
@@ -75,6 +93,19 @@ export class Trip {
 
   createdAt: Date;
   updatedAt: Date;
+
+  // ---------- motion signals ----------
+  @Prop({ type: Number, default: 45 })
+  tripSpeedLimits?: number;
+
+  @Prop({ type: TripSteerings, default: [] })
+  steeringWheelAngle?: TripSteerings[];
+
+  @Prop({ type: TripSpeeds, default: [] })
+  tripSpeeds?: TripSpeeds[];
+
+  @Prop({ type: TripAcclerations, default: [] })
+  tripAccelerations?: TripAcclerations[];
 }
 
 export const TripSchema = SchemaFactory.createForClass(Trip);

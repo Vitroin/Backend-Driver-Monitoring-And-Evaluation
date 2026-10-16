@@ -36,3 +36,4 @@ export function longTermScore(trips: ScoredTrip[], now: Date = new Date()): numb
   }
   return totalWeight === 0 ? null : roundToOneDecimal(weightedSum / totalWeight);
 }
+

@@ -1,7 +1,16 @@
 import type { DataResponseDto } from '@common';
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
-import type { LastTripScoreDto, RecentTripDto, TripTotalsDto } from './response';
+import type {
+  AccelerationPointDto,
+  DetectedEventDto,
+  LastTripScoreDto,
+  RecentTripDto,
+  SpeedPointDto,
+  SteeringPointDto,
+  TripOverallDto,
+  TripTotalsDto,
+} from './response';
 import { average, longTermScore, riskForScore, roundToOneDecimal } from './trip-scoring';
 import { TripDocument } from './trips.model';
 import { TripsRepository } from './trips.repository';
@@ -17,6 +26,7 @@ const RECENT_TRIPS_LIST_SIZE = 6;
 export class TripsService {
   constructor(private readonly tripsRepository: TripsRepository) {}
 
+  // ---------- used by the Main Dashboard ----------
   async getLastTripScore(driverId: string): Promise<DataResponseDto<LastTripScoreDto | null>> {
     const [last, ...previous] = await this.tripsRepository.findScoredTrips(driverId, { limit: RECENT_TRIPS + 1 });
     if (!last) return { message: 'No completed trips yet', data: null };
@@ -32,27 +42,61 @@ export class TripsService {
     };
   }
 
-  async getTotals(driverId: string): Promise<DataResponseDto<TripTotalsDto>> {
-    const totals = await this.tripsRepository.getTotals(driverId);
-    // Adding up decimals can give 104.89999999999999, so round the distance
-    return { message: 'Trip totals', data: { ...totals, distanceKm: roundToOneDecimal(totals.distanceKm) } };
-  }
 
-  async getRecentTrips(driverId: string): Promise<DataResponseDto<RecentTripDto[]>> {
-    const trips = await this.tripsRepository.findRecent(driverId, RECENT_TRIPS_LIST_SIZE);
+
+  //---------- used by the Trip Dashboard ----------
+  // The trip page's overall stats card
+  async getTripOverall(tripId: Types.ObjectId): Promise<DataResponseDto<TripOverallDto>> {
+    const trip = await this.tripsRepository.findById(tripId.toString());
+    if (!trip) throw new NotFoundException('Trip not found');
+
+    const { durationSeconds, distanceKm, averageSpeedKmh, topSpeedKmh, eventsCount, score, risk } = trip;
     return {
-      message: 'Recent trips',
-      data: trips.map(({ code, vehicle, status, startedAt, distanceKm, score, risk }) => ({
-        code,
-        vehicle,
-        status,
-        startedAt: startedAt.toISOString(),
+      message: 'Trip overall data',
+      data: {
+        durationMs: durationSeconds === null ? null : durationSeconds * 1000,
         distanceKm,
+        averageSpeedKmh,
+        topSpeedKmh,
+        eventsCount,
         score,
         risk,
-      })),
+      },
     };
   }
+
+  async getDetectedEvents(tripId: Types.ObjectId): Promise<DataResponseDto<DetectedEventDto[]>> {
+    const events = await this.tripsRepository.findDetectedEvents(tripId);
+    return {
+      message: 'Detected events',
+      data: events.map((event) => ({ ...event, occurredAt: event.occurredAt.toISOString() })),
+    };
+  }
+
+  async getSpeedMotionGraph(tripId: Types.ObjectId): Promise<DataResponseDto<SpeedPointDto[]>> {
+    const { speeds } = await this.tripsRepository.findSpeedMotionGraph(tripId);
+    return {
+      message: 'Trip speed motion graph',
+      data: speeds.map((s) => ({ time: s.time, speed: s.speed })),
+    };
+  }
+
+  async getAccelerationMotionGraph(tripId: Types.ObjectId): Promise<DataResponseDto<AccelerationPointDto[]>> {
+    const { accelerations } = await this.tripsRepository.findAccelerationMotionGraph(tripId);
+    return {
+      message: 'Trip acceleration motion graph',
+      data: accelerations.map((a) => ({ time: a.time, acceleration: a.acceleration })),
+    };
+  }
+
+  async getSteeringMotionGraph(tripId: Types.ObjectId): Promise<DataResponseDto<SteeringPointDto[]>> {
+    const { steerings } = await this.tripsRepository.findSteeringMotionGraph(tripId);
+    return {
+      message: 'Trip steering motion graph',
+      data: steerings.map((s) => ({ time: s.time, steeringWheelAngle: s.steeringWheelAngle })),
+    };
+  }
+
 
   // Long-term score ring + "Score over time" chart
   async getScoreOverview(driverId: string): Promise<DataResponseDto<ScoreOverviewDto>> {
@@ -74,6 +118,41 @@ export class TripsService {
     };
   }
 
+
+  
+  async getTotals(driverId: string): Promise<DataResponseDto<TripTotalsDto>> {
+    const totals = await this.tripsRepository.getTotals(driverId);
+    // Adding up decimals can give 104.89999999999999, so round the distance
+    return { message: 'Trip totals', data: { ...totals, distanceKm: roundToOneDecimal(totals.distanceKm) } };
+  }
+
+
+
+  async getRecentTrips(driverId: string): Promise<DataResponseDto<RecentTripDto[]>> {
+    const trips = await this.tripsRepository.findRecent(driverId, RECENT_TRIPS_LIST_SIZE);
+    return {
+      message: 'Recent trips',
+      data: trips.map(({ code, vehicle, status, startedAt, distanceKm, score, risk }) => ({
+        code,
+        vehicle,
+        status,
+        startedAt: startedAt.toISOString(),
+        distanceKm,
+        score,
+        risk,
+      })),
+    };
+  }
+
+
+
+
+  filterTrips(driverId: Types.ObjectId, dto: TripsFilterDto) {
+    return this.tripsRepository.filterTrips(driverId, dto);
+  }
+
+
+
   // ---------- used by other modules ----------
 
   findByCode(code: string): Promise<TripDocument | null> {
@@ -84,11 +163,7 @@ export class TripsService {
     return this.tripsRepository.findById(id);
   }
 
-  test(driverId: Types.ObjectId, dto: TripsFilterDto) {
-    console.log('driverId:', driverId)
-    console.log('dto:', dto)
-    return this.tripsRepository.filterTrips(driverId, dto);
-  }
+
 
   // The report's trend and recommendations: the driver's scored trips before `before`, newest first
   findPreviousScoredTrips(driverId: Types.ObjectId, before: Date, limit: number) {

@@ -3,8 +3,9 @@ import { UsersRepository } from './users.repository';
 import { UsersFactory } from './users.factory';
 import { Types } from 'mongoose';
 import { CreateUserDto } from './create-user.dto';
-import { randomUUID } from 'node:crypto';
 import { UserStatus } from '@common/enums';
+import type { DataResponseDto, MessageResponseDto } from '@common';
+import type { FullNameResponseDto } from './response/full-name.response';
 
 @Injectable()
 export class UsersService {
@@ -13,7 +14,28 @@ export class UsersService {
     readonly usersFactory: UsersFactory,
   ) {}
 
-  
+  async updateFullName(id: string, fullName: string): Promise<DataResponseDto<FullNameResponseDto>> {
+    const user = await this.usersRepository.updateById(id, { fullName });
+    if (!user) throw new NotFoundException('User not found');
+    return { message: 'Full name updated successfully', data: { fullName: user.fullName } };
+  }
+
+  /** Records a deletion request. Repeating it keeps the first request's date. */
+  async requestDeletion(id: string | Types.ObjectId): Promise<MessageResponseDto> {
+    const user = await this.usersRepository.updateOne(
+      { _id: new Types.ObjectId(id), deletionRequestedAt: null },
+      { deletionRequestedAt: new Date() },
+    );
+    return { message: user ? 'Your deletion request was recorded' : 'Your deletion request was already recorded' };
+  }
+
+  /** Returns Enrolled Organizations */
+  async showEnrolledOrganizations(id: string){
+    const user = await this.usersRepository.findById(id);
+    if (!user) throw new NotFoundException('User not found');
+    return user.organization;
+  }
+
   /** Sets a new password, clears mustChangePassword and rotates the stamp (old tokens stop working). @returns The new stamp. */
   async changePassword(id: string, passwordHash: string): Promise<string> {
     const securityStamp = new Types.ObjectId();
@@ -71,15 +93,4 @@ export class UsersService {
   findForAuthentication(id: string) {
     return this.usersRepository.findById(id);
   }
-
-  /** Records a deletion request. @returns false if one was already recorded (the first request's date is kept). */
-  async requestDeletion(id: string | Types.ObjectId): Promise<boolean>{
-    const user = await this.usersRepository.updateOne(
-      {_id: new Types.ObjectId(id), deletionRequestedAt: null},
-      {deletionRequestedAt: new Date()},
-    )
-    return user !== null;
-  }
-
-
 }

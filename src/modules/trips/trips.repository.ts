@@ -1,6 +1,6 @@
 import { TripStatus } from '@common/enums';
 import { BaseRepository } from '@common/repositories';
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, QueryFilter, Types } from 'mongoose';
 import type { ScoredTrip } from './trip-scoring';
@@ -10,6 +10,10 @@ import { Incident } from '@modules/incidents/incidents.model';
 
 export type TripTotals = { trips: number; distanceKm: number; durationSeconds: number };
 export type ScoredTripRow = ScoredTrip & { _id: Types.ObjectId; code: string };
+export type MapTripRow = Pick<
+  Trip,
+  'code' | 'status' | 'startedAt' | 'durationSeconds' | 'distanceKm' | 'speedLimitKmh' | 'driver' | 'organization'
+> & { _id: Types.ObjectId };
 
 const EMPTY_TOTALS: TripTotals = { trips: 0, distanceKm: 0, durationSeconds: 0 };
 
@@ -81,6 +85,80 @@ export class TripsRepository extends BaseRepository<Trip> {
     ]);
   }
 
+
+  // Returns the incidents of a trip, each with its type, severity, occurredAt and pointsDeducted fields. The trip's own fields aren't returned.
+  async findDetectedEvents(tripId: string | Types.ObjectId) {
+    const trip = await this.tripModel
+      .findById(tripId)
+      .select('_id') // the trip's own fields aren't needed, only its incidents
+      .populate({
+        path: 'incidents',
+        select: 'type severity occurredAt pointsDeducted trip -_id',
+      })
+      .lean<{ incidents: Pick<Incident, 'type' | 'severity' | 'occurredAt' | 'pointsDeducted'>[] }>()
+      .exec();
+
+    return (
+      trip?.incidents.map(({ type, severity, occurredAt, pointsDeducted }) => ({
+        type,
+        severity,
+        occurredAt,
+        pointsDeducted,
+      })) ?? []
+    );
+  }
+
+  // The trip map's summary fields, plus driver and organization for the access check.
+  // lean() also skips the incidents autopopulate; the map loads them with its own filtered query.
+  findMapTrip(tripId: string | Types.ObjectId): Promise<MapTripRow | null> {
+    return this.tripModel
+      .findById(tripId)
+      .select('code status startedAt durationSeconds distanceKm speedLimitKmh driver organization')
+      .lean<MapTripRow>()
+      .exec();
+  }
+
+  // Returns the trip's motion signals: steeringWheelAngle, tripSpeeds, accelerations, tripSpeedLimits and tripAccelerations.
+  async findSpeedMotionGraph(tripId: string | Types.ObjectId) {
+    const trip = await this.tripModel
+      .findById(tripId)
+      .select('tripSpeeds  -_id')
+      .lean<Pick<Trip,  'tripSpeeds'>>()
+      .exec();
+    if (!trip) throw new NotFoundException(`Trip ${tripId} not found`);
+
+    return {
+      speeds: trip.tripSpeeds ?? [],
+    };
+  }
+
+  async findAccelerationMotionGraph(tripId: string | Types.ObjectId) {
+    const trip = await this.tripModel
+      .findById(tripId)
+      .select('tripAccelerations  -_id')
+      .lean<Pick<Trip,  'tripAccelerations'>>()
+      .exec();
+    if (!trip) throw new NotFoundException(`Trip ${tripId} not found`);
+
+    return {
+      accelerations: trip.tripAccelerations ?? [],
+    };
+  }
+
+  async findSteeringMotionGraph(tripId: string | Types.ObjectId) {
+    const trip = await this.tripModel
+      .findById(tripId)
+      .select('steeringWheelAngle  -_id')
+      .lean<Pick<Trip,  'steeringWheelAngle'>>()
+      .exec();
+    if (!trip) throw new NotFoundException(`Trip ${tripId} not found`);
+
+    return {
+      steerings: trip.steeringWheelAngle ?? [],
+    };
+  }
+
+  // Helper Functions to find incidents for a trip, with optional filtering by event type---------------------------
   async findIncidentsForTrip(tripId: string | Types.ObjectId) {
     const trip = await this.tripModel
       .findById(tripId)

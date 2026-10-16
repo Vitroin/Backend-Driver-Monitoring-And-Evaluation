@@ -2,7 +2,7 @@ import type { DataResponseDto } from '@common';
 import { Injectable } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { IncidentDocument } from './incidents.model';
-import { IncidentsRepository } from './incidents.repository';
+import { IncidentsRepository, type TripIncidentFilter, type TripIncidentRow } from './incidents.repository';
 import type { SignificantEventDto } from './response/significant-event.response';
 
 // "Most significant events": the 5 incidents that cost the most points in the last 60 days
@@ -39,6 +39,11 @@ export class IncidentsService {
   // Every incident of the driver, newest first ("Download my data")
   findAllByDriver(driverId: Types.ObjectId): Promise<IncidentDocument[]> {
     return this.incidentsRepository.find({ driver: driverId }, undefined, { sort: { occurredAt: -1 } });
+  }
+
+  // One trip's incidents, oldest first (the trip map's markers and timeline)
+  findByTrip(tripId: Types.ObjectId, filter?: TripIncidentFilter): Promise<TripIncidentRow[]> {
+    return this.incidentsRepository.findByTrip(tripId, filter);
   }
   
 }

@@ -157,5 +157,15 @@ export class TripsController {
     return this.tripsService.getIncidentsCount(tripId);
   }
 
+  @ApiParam({ name: 'tripId', type: String, example: '6ad24e609609bf3649c97cdf' })
+  @Get('tripStatistics/:tripId')
+  getTripStatistics(@Param('tripId', ParseObjectIdPipe) tripId: Types.ObjectId) {
+    return this.tripsService.getTripStatistics(tripId);
+  }
   
+  @ApiParam({ name: 'tripId', type: String, example: '6ad24e609609bf3649c97cdf' })
+  @Get('incidentAnalysis/:tripId')
+  getIncidentAnalysis(@Param('tripId', ParseObjectIdPipe) tripId: Types.ObjectId) {
+    return this.tripsService.incidentAnalysis(tripId);
+  }
 }

@@ -105,7 +105,7 @@ export class TripsService {
     };
   }
 
-  //---------- Used By the Trip Dashboard's ----------------
+  //---------- Used By the Trip Report Dashboard's ----------------
 
   async getTripDashboardHeader(tripId: Types.ObjectId) {
     const trip = await this.tripsRepository.findDashboardHeader(tripId);
@@ -135,6 +135,39 @@ export class TripsService {
     }, zeroCounts);
 
     return { message: 'Trip incidents count', data: counts };
+  }
+
+  //Trip Report: get trip statistics: duration, distance, average speed, top speed, events count
+  async getTripStatistics(tripId: Types.ObjectId) {
+    const trip = await this.tripsRepository.findById(tripId.toString());
+    if (!trip) throw new NotFoundException('Trip not found');
+    return {
+      message: 'Trip statistics',
+      data: {
+        durationSeconds: trip.durationSeconds,
+        distanceKm: trip.distanceKm,
+        averageSpeedKmh: trip.averageSpeedKmh,
+        topSpeedKmh: trip.topSpeedKmh,
+        eventsCount: trip.eventsCount,
+      },
+    };
+  }
+
+  async incidentAnalysis(tripId: Types.ObjectId) {
+    const trip = await this.tripsRepository.findById(tripId.toString());
+    if (!trip) throw new NotFoundException('Trip not found');
+
+    const incidents = await this.incidentsService.findByTrip(tripId); 
+    const analysis = Object.values(IncidentType).map((incidentType) => {
+      const ofType = incidents.filter((incident) => incident.type === incidentType);
+      return {
+        incidentType,
+        count: ofType.length,
+        totalDeduction: roundToOneDecimal(ofType.reduce((sum, incident) => sum + incident.pointsDeducted, 0)),
+      };
+    });
+
+    return { message: 'Incident analysis', data: analysis };
   }
 
   //---------- -------------- ----------
@@ -186,10 +219,5 @@ export class TripsService {
     return this.tripsRepository.filterTrips(driverId, dto);
   }
 
-  // ---------- used by other modules ----------
-
-  findById(id: string): Promise<TripDocument | null> {
-    return this.tripsRepository.findById(id);
-  }
 
 }

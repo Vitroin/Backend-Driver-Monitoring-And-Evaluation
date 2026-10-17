@@ -1,6 +1,6 @@
 import { IncidentSeverity, IncidentType } from '@common/enums';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, Types } from 'mongoose';
 
 export type IncidentDocument = HydratedDocument<Incident>;
 

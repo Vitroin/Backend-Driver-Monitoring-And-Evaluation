@@ -7,6 +7,7 @@ import type { ScoredTrip } from './trip-scoring';
 import { Trip, TripDocument } from './trips.model';
 import { TripsFilterDto } from './trips_filter.dto';
 import { Incident } from '@modules/incidents/incidents.model';
+import type { User } from '@modules/users/user.model';
 
 export type TripTotals = { trips: number; distanceKm: number; durationSeconds: number };
 export type ScoredTripRow = ScoredTrip & { _id: Types.ObjectId; code: string };
@@ -14,6 +15,10 @@ export type MapTripRow = Pick<
   Trip,
   'code' | 'status' | 'startedAt' | 'durationSeconds' | 'distanceKm' | 'speedLimitKmh' | 'driver' | 'organization'
 > & { _id: Types.ObjectId };
+// driver is null if the user document no longer exists
+export type DashboardHeaderRow = Pick<Trip, 'startedAt' | 'durationSeconds' | 'vehicle'> & {
+  driver: Pick<User, 'fullName'> | null;
+};
 
 const EMPTY_TOTALS: TripTotals = { trips: 0, distanceKm: 0, durationSeconds: 0 };
 
@@ -86,28 +91,6 @@ export class TripsRepository extends BaseRepository<Trip> {
   }
 
 
-  // Returns the incidents of a trip, each with its type, severity, occurredAt and pointsDeducted fields. The trip's own fields aren't returned.
-  async findDetectedEvents(tripId: string | Types.ObjectId) {
-    const trip = await this.tripModel
-      .findById(tripId)
-      .select('_id') // the trip's own fields aren't needed, only its incidents
-      .populate({
-        path: 'incidents',
-        select: 'type severity occurredAt pointsDeducted trip -_id',
-      })
-      .lean<{ incidents: Pick<Incident, 'type' | 'severity' | 'occurredAt' | 'pointsDeducted'>[] }>()
-      .exec();
-
-    return (
-      trip?.incidents.map(({ type, severity, occurredAt, pointsDeducted }) => ({
-        type,
-        severity,
-        occurredAt,
-        pointsDeducted,
-      })) ?? []
-    );
-  }
-
   // The trip map's summary fields, plus driver and organization for the access check.
   // lean() also skips the incidents autopopulate; the map loads them with its own filtered query.
   findMapTrip(tripId: string | Types.ObjectId): Promise<MapTripRow | null> {
@@ -115,6 +98,16 @@ export class TripsRepository extends BaseRepository<Trip> {
       .findById(tripId)
       .select('code status startedAt durationSeconds distanceKm speedLimitKmh driver organization')
       .lean<MapTripRow>()
+      .exec();
+  }
+
+  // The trip dashboard's header fields, with the driver's full name populated.
+  findDashboardHeader(tripId: string | Types.ObjectId): Promise<DashboardHeaderRow | null> {
+    return this.tripModel
+      .findById(tripId)
+      .select('startedAt durationSeconds vehicle driver -_id')
+      .populate({ path: 'driver', select: 'fullName -_id' })
+      .lean<DashboardHeaderRow>()
       .exec();
   }
 
@@ -156,23 +149,5 @@ export class TripsRepository extends BaseRepository<Trip> {
     return {
       steerings: trip.steeringWheelAngle ?? [],
     };
-  }
-
-  // Helper Functions to find incidents for a trip, with optional filtering by event type---------------------------
-  async findIncidentsForTrip(tripId: string | Types.ObjectId) {
-    const trip = await this.tripModel
-      .findById(tripId)
-      .populate('incidents')
-      .lean<Trip & { incidents: Incident[] }>()
-      .exec();
-    return trip?.incidents ?? [];
-  }
-
-  async findFilteredIncidentsForTrip(tripId: string | Types.ObjectId, dto: TripsFilterDto) {
-    const incidents = await this.findIncidentsForTrip(tripId);
-    return incidents.filter((incident) => {
-      if (dto.eventType && incident.type !== dto.eventType) return false;
-      return true;
-    });
   }
 }

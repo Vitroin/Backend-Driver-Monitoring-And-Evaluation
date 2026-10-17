@@ -1,5 +1,7 @@
 import type { DataResponseDto } from '@common';
+import { IncidentType } from '@common/enums';
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { IncidentsService } from '@modules/incidents/incidents.service';
 import { Types } from 'mongoose';
 import type {
   AccelerationPointDto,
@@ -24,7 +26,10 @@ const RECENT_TRIPS_LIST_SIZE = 6;
 
 @Injectable()
 export class TripsService {
-  constructor(private readonly tripsRepository: TripsRepository) {}
+  constructor(
+    private readonly tripsRepository: TripsRepository,
+    private readonly incidentsService: IncidentsService,
+  ) {}
 
   // ---------- used by the Main Dashboard ----------
   async getLastTripScore(driverId: string): Promise<DataResponseDto<LastTripScoreDto | null>> {
@@ -41,8 +46,6 @@ export class TripsService {
       },
     };
   }
-
-
 
   //---------- used by the Trip Dashboard ----------
   // The trip page's overall stats card
@@ -66,10 +69,15 @@ export class TripsService {
   }
 
   async getDetectedEvents(tripId: Types.ObjectId): Promise<DataResponseDto<DetectedEventDto[]>> {
-    const events = await this.tripsRepository.findDetectedEvents(tripId);
+    const incidents = await this.incidentsService.findByTrip(tripId);
     return {
       message: 'Detected events',
-      data: events.map((event) => ({ ...event, occurredAt: event.occurredAt.toISOString() })),
+      data: incidents.map(({ type, severity, occurredAt, pointsDeducted }) => ({
+        type,
+        severity,
+        occurredAt: occurredAt.toISOString(),
+        pointsDeducted,
+      })),
     };
   }
 
@@ -97,6 +105,39 @@ export class TripsService {
     };
   }
 
+  //---------- Used By the Trip Dashboard's ----------------
+
+  async getTripDashboardHeader(tripId: Types.ObjectId) {
+    const trip = await this.tripsRepository.findDashboardHeader(tripId);
+    if (!trip) throw new NotFoundException('Trip not found');
+
+    return {
+      message: 'Trip dashboard header',
+      data: {
+        startedAt: trip.startedAt.toISOString(),
+        durationSeconds: trip.durationSeconds,
+        vehicle: trip.vehicle,
+        driverName: trip.driver?.fullName ?? null,
+      },
+    };
+  }
+
+  // How many times each incident type happened in the trip; types that didn't happen are 0
+  async getIncidentsCount(tripId: Types.ObjectId) {
+    const incidents = await this.incidentsService.findByTrip(tripId);
+    const zeroCounts = Object.fromEntries(Object.values(IncidentType).map((type) => [type, 0])) as Record<
+      IncidentType,
+      number
+    >;
+    const counts = incidents.reduce((acc, incident) => {
+      acc[incident.type]++;
+      return acc;
+    }, zeroCounts);
+
+    return { message: 'Trip incidents count', data: counts };
+  }
+
+  //---------- -------------- ----------
 
   // Long-term score ring + "Score over time" chart
   async getScoreOverview(driverId: string): Promise<DataResponseDto<ScoreOverviewDto>> {
@@ -118,15 +159,11 @@ export class TripsService {
     };
   }
 
-
-  
   async getTotals(driverId: string): Promise<DataResponseDto<TripTotalsDto>> {
     const totals = await this.tripsRepository.getTotals(driverId);
     // Adding up decimals can give 104.89999999999999, so round the distance
     return { message: 'Trip totals', data: { ...totals, distanceKm: roundToOneDecimal(totals.distanceKm) } };
   }
-
-
 
   async getRecentTrips(driverId: string): Promise<DataResponseDto<RecentTripDto[]>> {
     const trips = await this.tripsRepository.findRecent(driverId, RECENT_TRIPS_LIST_SIZE);
@@ -144,14 +181,9 @@ export class TripsService {
     };
   }
 
-
-
-
   filterTrips(driverId: Types.ObjectId, dto: TripsFilterDto) {
     return this.tripsRepository.filterTrips(driverId, dto);
   }
-
-
 
   // ---------- used by other modules ----------
 
@@ -163,17 +195,10 @@ export class TripsService {
     return this.tripsRepository.findById(id);
   }
 
-
-
   // The report's trend and recommendations: the driver's scored trips before `before`, newest first
   findPreviousScoredTrips(driverId: Types.ObjectId, before: Date, limit: number) {
     return this.tripsRepository.findScoredTrips(driverId, { before, limit });
   }
 
-  findAllByDriver(driverId: Types.ObjectId): Promise<TripDocument[]> {
-    return this.tripsRepository.find({ driver: driverId }, { sort: { startedAt: -1 } });
-  }
 
-
-  
 }

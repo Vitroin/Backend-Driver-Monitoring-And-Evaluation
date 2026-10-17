@@ -31,7 +31,8 @@ export class TripsRepository extends BaseRepository<Trip> {
   // Main dashboard: Totals over the driver's completed trips; zeros when they have none
   async getTotals(driverId: string | Types.ObjectId): Promise<TripTotals> {
     const [totals] = await this.tripModel.aggregate<TripTotals>([
-      { $match: { driverId, status: TripStatus.COMPLETED } },
+      // aggregate() doesn't cast like find(), so the id must already be an ObjectId
+      { $match: { driver: new Types.ObjectId(driverId), status: TripStatus.COMPLETED, score: { $ne: null } } },
       {
         $group: {
           _id: null,
@@ -40,28 +41,18 @@ export class TripsRepository extends BaseRepository<Trip> {
           durationSeconds: { $sum: '$durationSeconds' },
         },
       },
-      { $project: { _id: 0 } },
+      { $project: { _id: 0, trips: 1, distanceKm: { $round: ['$distanceKm', 2] }, durationSeconds: 1 } },
     ]);
     return totals ?? { ...EMPTY_TOTALS };
   }
 
-  // Scored, completed trips, newest first.
-  // `before` keeps trips that started earlier; `limit` 0 means no limit.
-  findScoredTrips(driverId: string | Types.ObjectId, { before, limit = 0 }: { before?: Date; limit?: number } = {}) {
-    const filter: QueryFilter<Trip> = {
-      driver: driverId,
-      status: TripStatus.COMPLETED,
-      score: { $ne: null },
-    };
-    if (before) filter.startedAt = { $lt: before };
-
-    return this.tripModel.find(filter).sort({ startedAt: -1 }).limit(limit).lean<ScoredTripRow[]>().exec();
-  }
-
-  // Latest trips of any status, newest first.
   // Not lean(): `risk` is a virtual, and lean() drops virtuals.
-  findRecentTrips(driverId: string | Types.ObjectId, limit: number): Promise<TripDocument[]> {
-    return this.tripModel.find({ driver: driverId }).sort({ startedAt: -1 }).limit(limit).exec();
+  findRecentTrip(driverId: string | Types.ObjectId, limit: number): Promise<TripDocument[]> {
+    return this.tripModel
+      .find({ driver: driverId, status: TripStatus.COMPLETED, score: { $ne: null } })
+      .sort({ startedAt: -1 })
+      .limit(limit)
+      .exec();
   }
 
   // The driver's trips matching the filter, newest first, each with its incidents in chronological order.
@@ -235,10 +226,11 @@ export class TripsRepository extends BaseRepository<Trip> {
       .exec();
   }
 
+  // Used in the graph of the My Progress Dashboard AND graph of the main Dashboard
   async progressGraph(driverId: string | Types.ObjectId) {
     return this.tripModel.aggregate([
       { $match: { driver: new Types.ObjectId(driverId), status: TripStatus.COMPLETED, score: { $ne: null } } },
-      { $sort: { date: 1 } },
+      { $sort: { date: -1 } },
       {
         $group: {
           _id: null,

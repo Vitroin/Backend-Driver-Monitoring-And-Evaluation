@@ -2,7 +2,7 @@ import { Language } from '@common/enums';
 import { UserRole } from '@common/enums/user/user_roles.enum';
 import { UserStatus } from '@common/enums/user/user_status.enum';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { HydratedDocument, Types } from 'mongoose';
+import mongoose, { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 
 export type UserDocument = HydratedDocument<User>;
 
@@ -34,7 +34,7 @@ export class User {
   @Prop({ required: true, lowercase: true })
   email: string;
 
-  @Prop({ type: Types.ObjectId, required: true, default: () => new Types.ObjectId() })
+  @Prop({ type: SchemaTypes.ObjectId, required: true, default: () => new Types.ObjectId() })
   securityStamp: Types.ObjectId;
 
   @Prop({ required: true })
@@ -46,7 +46,7 @@ export class User {
   @Prop({ required: true, type: String, enum: UserStatus, default: UserStatus.WAITING_FOR_ACTIVATION })
   status: UserStatus;
 
-  @Prop({ type: [Types.ObjectId], ref: 'Organization' })
+  @Prop({ type: [SchemaTypes.ObjectId], ref: 'Organization' })
   organization: Types.ObjectId[];
 
   @Prop({ type: String, enum: UserRole, required: true })

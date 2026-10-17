@@ -31,22 +31,6 @@ export class TripsService {
     private readonly incidentsService: IncidentsService,
   ) {}
 
-  // ---------- used by the Main Dashboard ----------
-  async getLastTripScore(driverId: string): Promise<DataResponseDto<LastTripScoreDto | null>> {
-    const [last, ...previous] = await this.tripsRepository.findScoredTrips(driverId, { limit: RECENT_TRIPS + 1 });
-    if (!last) return { message: 'No completed trips yet', data: null };
-
-    const previousAverage = previous.length > 0 ? average(previous.map((trip) => trip.score)) : null;
-    return {
-      message: 'Last trip score',
-      data: {
-        score: last.score,
-        previousAverage: previousAverage === null ? null : roundToOneDecimal(previousAverage),
-        change: previousAverage === null ? null : roundToOneDecimal(last.score - previousAverage),
-      },
-    };
-  }
-
   //---------- used by the Trip Dashboard ----------
   // The trip page's overall stats card
   async getTripOverall(tripId: Types.ObjectId): Promise<DataResponseDto<TripOverallDto>> {
@@ -174,33 +158,23 @@ export class TripsService {
 
   // ---------- used by the Main Dashboard ----------
   // Long-term score ring + "Score over time" chart
-  async getScoreOverview(driverId: string): Promise<DataResponseDto<ScoreOverviewDto>> {
-    const trips = (await this.tripsRepository.findScoredTrips(driverId)).reverse(); // oldest first, like the chart
-    const longTerm = longTermScore(trips);
-    return {
-      message: 'Score overview',
-      data: {
-        longTermScore: longTerm,
-        riskLevel: longTerm === null ? null : riskForScore(longTerm),
-        // One point per completed trip; the chart shows the last 14
-        history: trips.map((trip) => ({
-          tripId: trip._id.toString(),
-          code: trip.code,
-          score: trip.score,
-          startedAt: trip.startedAt.toISOString(),
-        })),
-      },
-    };
-  }
 
   async getTotals(driverId: string): Promise<DataResponseDto<TripTotalsDto>> {
-    const totals = await this.tripsRepository.getTotals(driverId);
-    // Adding up decimals can give 104.89999999999999, so round the distance
-    return { message: 'Trip totals', data: { ...totals, distanceKm: roundToOneDecimal(totals.distanceKm) } };
-  }
+    const [totals, [lastTrip], [recentAverage]] = await Promise.all([
+      this.tripsRepository.getTotals(driverId),
+      this.tripsRepository.findRecentTrip(driverId, 1),
+      this.tripsRepository.averageRecentTripScore(driverId, 5),
+    ]);
 
+    const lastTripScore = lastTrip?.score ?? null;
+    const difference =
+      lastTripScore !== null && recentAverage ? roundToOneDecimal(lastTripScore - recentAverage.averageScore) : null;
+
+    return { message: 'Trip totals', data: { ...totals, lastTripScore, difference } };
+  }
+  
   async getRecentTrips(driverId: string): Promise<DataResponseDto<RecentTripDto[]>> {
-    const trips = await this.tripsRepository.findRecentTrips(driverId, RECENT_TRIPS_LIST_SIZE);
+    const trips = await this.tripsRepository.findRecentTrip(driverId, RECENT_TRIPS_LIST_SIZE);
     return {
       message: 'Recent trips',
       data: trips.map(({ code, vehicle, status, startedAt, distanceKm, score, risk }) => ({
@@ -255,7 +229,7 @@ export class TripsService {
     const graphData = await this.tripsRepository.progressGraph(driverId);
     return {
       message: 'Progress graph data',
-      data: graphData
-    }
+      data: graphData,
+    };
   }
 }

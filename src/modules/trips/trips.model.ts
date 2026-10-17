@@ -3,7 +3,7 @@ import { Incident } from '@modules/incidents/incidents.model';
 import { Organization } from '@modules/organizations/organization.model';
 import { User } from '@modules/users/user.model';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 import { riskForScore } from './trip-scoring';
 
 export type TripDocument = HydratedDocument<Trip>;
@@ -44,14 +44,14 @@ export class Trip {
   @Prop({ required: true, unique: true })
   code: string;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: User.name, required: true })
   driver: Types.ObjectId;
 
   // Virtual, populated from Incident.trip (see TripSchema.virtual below)
   incidents?: Incident[];
 
   // Copied from the driver so an organization's trips can be listed with one query
-  @Prop({ type: Types.ObjectId, ref: Organization.name, required: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: Organization.name, required: true })
   organization: Types.ObjectId;
 
   @Prop({ required: true })

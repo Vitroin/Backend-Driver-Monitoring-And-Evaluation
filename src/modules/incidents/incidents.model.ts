@@ -1,6 +1,6 @@
 import { IncidentSeverity, IncidentType } from '@common/enums';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 
 export type IncidentDocument = HydratedDocument<Incident>;
 
@@ -26,11 +26,11 @@ const IncidentLocationSchema = SchemaFactory.createForClass(IncidentLocation);
   toObject: { virtuals: true },
 })
 export class Incident {
-  @Prop({ type: Types.ObjectId, ref: 'Trip', required: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Trip', required: true })
   trip: Types.ObjectId;
 
   // Copied from the trip so a driver's incidents can be queried without going through their trips
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'User', required: true })
   driver: Types.ObjectId;
 
   @Prop({ type: String, enum: IncidentType, required: true })

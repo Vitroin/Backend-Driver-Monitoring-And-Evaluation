@@ -1,36 +1,33 @@
-import { tripsFilterSchema, type TripsFilterDto } from './trips_filter.dto';
-import { AllowedRoles, BaseResponseSchema, CurrentUser, Public } from '@common';
 import type { DataResponseDto } from '@common';
+import { AllowedRoles, BaseResponseSchema, CurrentUser } from '@common';
 import { UserRole } from '@common/enums';
 import { Controller, Get, Param, Query } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
+import { ParseObjectIdPipe } from '@nestjs/mongoose';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
+import { Types } from 'mongoose';
 import {
   accelerationPointSchema,
   detectedEventSchema,
   filteredTripSchema,
-  lastTripScoreSchema,
-  tripOverallSchema,
   recentTripSchema,
   speedPointSchema,
   steeringPointSchema,
+  tripOverallSchema,
   tripTotalsSchema,
   type AccelerationPointDto,
   type DetectedEventDto,
-  type LastTripScoreDto,
   type RecentTripDto,
   type SpeedPointDto,
   type SteeringPointDto,
   type TripOverallDto,
-  type TripTotalsDto,
+  type TripTotalsDto
 } from './response';
-import { TripsService } from './trips.service';
 import { ScoreOverviewDto, scoreOverviewSchema } from './response/score-overview.response';
-import { ParseObjectIdPipe } from '@nestjs/mongoose';
-import { Types } from 'mongoose';
+import { TripsService } from './trips.service';
+import { tripsFilterSchema, type TripsFilterDto } from './trips_filter.dto';
 
 // Every route here is the logged-in driver's own dashboard data
-// @AllowedRoles([UserRole.DRIVER])
-@Public()
+@AllowedRoles([UserRole.DRIVER])
 @Controller('trips')
 export class TripsController {
   constructor(private readonly tripsService: TripsService) {}
@@ -111,18 +108,10 @@ export class TripsController {
     summary: "The logged-in driver's totals over completed trips: trip count, distance and driving time",
   })
   @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(tripTotalsSchema) })
+  @ApiBearerAuth()
   @Get('me/totals')
   getMyTotals(@CurrentUser('id') driverId: string): Promise<DataResponseDto<TripTotalsDto>> {
     return this.tripsService.getTotals(driverId);
-  }
-
-
-
-  @ApiOperation({ summary: "The logged-in driver's last trip score compared with their recent average" })
-  @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(lastTripScoreSchema.nullable()) })
-  @Get('me/last-score')
-  getMyLastTripScore(@CurrentUser('id') driverId: string): Promise<DataResponseDto<LastTripScoreDto | null>> {
-    return this.tripsService.getLastTripScore(driverId);
   }
 
 
@@ -133,16 +122,6 @@ export class TripsController {
   getMyRecentTrips(@CurrentUser('id') driverId: string): Promise<DataResponseDto<RecentTripDto[]>> {
     return this.tripsService.getRecentTrips(driverId);
   }
-
-
-
-  @ApiOperation({ summary: "The logged-in driver's long-term score, risk level and score history" })
-  @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(scoreOverviewSchema) })
-  @Get('me/score-overview')
-  getMyScoreOverview(@CurrentUser('id') driverId: string): Promise<DataResponseDto<ScoreOverviewDto>> {
-    return this.tripsService.getScoreOverview(driverId);
-  }
-
 
   //---------- Used By the Trip Report Dashboard's ----------------
   @ApiParam({ name: 'tripId', type: String, example: '6ad24e609609bf3649c97cdf' })

@@ -1,6 +1,6 @@
 import { User } from '@modules/users/user.model';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { HydratedDocument, Types } from 'mongoose';
+import mongoose, { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 
 export type DriverDocument = HydratedDocument<Driver>;
 /*
@@ -15,7 +15,7 @@ export class Driver extends User {
   licenseNumber: string | null;
 
   // The driving-school instructor who evaluates this driver
-  @Prop({ type: Types.ObjectId, ref: User.name, default: null })
+  @Prop({ type: SchemaTypes.ObjectId, ref: User.name, default: null })
   instructor: Types.ObjectId | null;
 }
 

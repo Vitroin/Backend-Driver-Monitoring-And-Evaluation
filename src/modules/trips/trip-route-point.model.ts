@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { HydratedDocument, Types } from 'mongoose';
+import mongoose, { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 
 export type TripRoutePointDocument = HydratedDocument<TripRoutePoint>;
 
@@ -10,7 +10,7 @@ export type TripRoutePointDocument = HydratedDocument<TripRoutePoint>;
  */
 @Schema({ versionKey: false })
 export class TripRoutePoint {
-  @Prop({ type: Types.ObjectId, ref: 'Trip', required: true })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Trip', required: true })
   trip: Types.ObjectId;
 
   // When the in-vehicle unit took the fix

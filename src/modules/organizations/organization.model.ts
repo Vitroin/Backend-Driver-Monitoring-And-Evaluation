@@ -1,7 +1,7 @@
 import { OrganizationTypes } from '@modules/organizations/organizations.enum';
 import { User } from '@modules/users/user.model';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { Types } from 'mongoose';
+import mongoose, { SchemaTypes, Types } from 'mongoose';
 @Schema({ timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } })
 export class Organization {
   @Prop({ required: true })
@@ -10,7 +10,7 @@ export class Organization {
   @Prop({ required: true, unique: true, index: true })
   slug: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'User', default: null })
   organizationOwner: Types.ObjectId | null;
 
   @Prop({ type: String, enum: OrganizationTypes })

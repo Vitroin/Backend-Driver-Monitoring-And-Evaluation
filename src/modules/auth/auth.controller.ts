@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
-import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { minutes, Throttle } from '@nestjs/throttler';
 import type { TokenPair } from './token';
 import { AuthService } from './auth.service';
@@ -41,6 +41,7 @@ const STRICT_THROTTLE = { default: { limit: 5, ttl: minutes(1) } };
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @ApiBearerAuth()
   @AllowedRoles([UserRole.SUPER_ADMIN])
   @ApiOperation({ summary: 'User invitation' })
   @ApiResponse({ status: 201, description: 'User invited successfully' })
@@ -136,6 +137,7 @@ export class AuthController {
     return this.authService.validateResetPasswordOtp(dto);
   }
 
+  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Change the logged in user password',
     description: 'Ends every other session and returns a new token pair. Super admins must also send `otp`.',
@@ -148,6 +150,7 @@ export class AuthController {
     return this.authService.changePassword(dto, userId);
   }
 
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Log out of the current session' })
   @ApiResponse({ status: 204, description: 'Logged out' })
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -156,6 +159,7 @@ export class AuthController {
     return this.authService.logout(session);
   }
 
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Log a user out of every device. Requires super admin role.' })
   @ApiResponse({ status: 200, standardSchema: messageResponse })
   @ApiResponse({ status: 404, description: 'User not found' })
@@ -165,6 +169,7 @@ export class AuthController {
     return this.authService.revokeUserSessions(id);
   }
 
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Return the logged in user' })
   @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(userResponseSchema) })
   @Get('me')

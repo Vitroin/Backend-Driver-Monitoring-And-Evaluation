@@ -1,11 +1,12 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AllowedRoles, BaseResponseSchema, CurrentUser, DataResponseDto } from '@common';
 import { UserRole } from '@common/enums';
 
 import { IncidentsService } from './incidents.service';
 import { SignificantEventDto, significantEventSchema } from './response/significant-event.response';
 
+@ApiBearerAuth()
 @Controller('incidents')
 export class IncidentsController {
   constructor(private readonly incidentsService: IncidentsService) {}

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post } from '@nestjs/common';
-import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { BaseResponseSchema, CurrentUser } from '@common';
 import type { DataResponseDto, MessageResponseDto } from '@common';
 import { objectIdSchema } from '@common/types';
@@ -8,6 +8,7 @@ import { updateFullNameSchema, type UpdateFullNameDto } from './update-full-name
 import { fullNameResponseSchema, type FullNameResponseDto } from './response/full-name.response';
 
 // Every route here acts on the logged in user's own account, whatever their role
+@ApiBearerAuth()
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}

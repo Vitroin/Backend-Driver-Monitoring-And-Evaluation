@@ -24,4 +24,7 @@ export const environmentVariablesValidationSchema = z.object({
   JWT_REFRESH_TOKEN_TTL_DAYS: z.coerce.number().default(7),
   
   APP_CLIENT_URL: z.url({ message: 'APP_CLIENT_URL is required' }),
+
+  FASTAPI_URL: z.url({ message: 'FASTAPI_URL is required' }),
+  SERVICE_TOKEN: z.string().nonempty({ message: 'SERVICE_TOKEN is required' }),
 });

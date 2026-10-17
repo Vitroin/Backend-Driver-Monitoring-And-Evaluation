@@ -21,4 +21,7 @@ export enum ConfigNames {
 
   JWT_ACCESS_TOKEN_TTL_MINUTES = 'jwt.accessTokenTtlMinutes',
   JWT_REFRESH_TOKEN_TTL_DAYS = 'jwt.refreshTokenTtlDays',
+
+  FASTAPI_URL = 'fastapi.url',
+  SERVICE_TOKEN = 'fastapi.serviceToken',
 }

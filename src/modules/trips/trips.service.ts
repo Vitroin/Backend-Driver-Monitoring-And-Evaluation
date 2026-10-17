@@ -139,6 +139,7 @@ export class TripsService {
 
   //---------- -------------- ----------
 
+  // ---------- used by the Main Dashboard ----------
   // Long-term score ring + "Score over time" chart
   async getScoreOverview(driverId: string): Promise<DataResponseDto<ScoreOverviewDto>> {
     const trips = (await this.tripsRepository.findScoredTrips(driverId)).reverse(); // oldest first, like the chart
@@ -166,7 +167,7 @@ export class TripsService {
   }
 
   async getRecentTrips(driverId: string): Promise<DataResponseDto<RecentTripDto[]>> {
-    const trips = await this.tripsRepository.findRecent(driverId, RECENT_TRIPS_LIST_SIZE);
+    const trips = await this.tripsRepository.findRecentTrips(driverId, RECENT_TRIPS_LIST_SIZE);
     return {
       message: 'Recent trips',
       data: trips.map(({ code, vehicle, status, startedAt, distanceKm, score, risk }) => ({
@@ -187,18 +188,8 @@ export class TripsService {
 
   // ---------- used by other modules ----------
 
-  findByCode(code: string): Promise<TripDocument | null> {
-    return this.tripsRepository.findOne({ code });
-  }
-
   findById(id: string): Promise<TripDocument | null> {
     return this.tripsRepository.findById(id);
   }
-
-  // The report's trend and recommendations: the driver's scored trips before `before`, newest first
-  findPreviousScoredTrips(driverId: Types.ObjectId, before: Date, limit: number) {
-    return this.tripsRepository.findScoredTrips(driverId, { before, limit });
-  }
-
 
 }

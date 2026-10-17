@@ -146,7 +146,7 @@ export class TripsController {
 
   //---------- Used By the Trip Report Dashboard's ----------------
   @ApiParam({ name: 'tripId', type: String, example: '6ad24e609609bf3649c97cdf' })
-  @Get('dashboardHeader/:tripId')
+  @Get('tripReportHeader/:tripId')
   getTripDashboardHeader(@Param('tripId', ParseObjectIdPipe) tripId: Types.ObjectId) {
     return this.tripsService.getTripDashboardHeader(tripId);
   }

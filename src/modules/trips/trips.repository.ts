@@ -28,7 +28,7 @@ export class TripsRepository extends BaseRepository<Trip> {
     super(tripModel);
   }
 
-  // Totals over the driver's completed trips; zeros when they have none
+  // Main dashboard: Totals over the driver's completed trips; zeros when they have none
   async getTotals(driverId: string | Types.ObjectId): Promise<TripTotals> {
     const [totals] = await this.tripModel.aggregate<TripTotals>([
       { $match: { driverId, status: TripStatus.COMPLETED } },
@@ -60,7 +60,7 @@ export class TripsRepository extends BaseRepository<Trip> {
 
   // Latest trips of any status, newest first.
   // Not lean(): `risk` is a virtual, and lean() drops virtuals.
-  findRecent(driverId: string | Types.ObjectId, limit: number): Promise<TripDocument[]> {
+  findRecentTrips(driverId: string | Types.ObjectId, limit: number): Promise<TripDocument[]> {
     return this.tripModel.find({ driver: driverId }).sort({ startedAt: -1 }).limit(limit).exec();
   }
 
@@ -90,7 +90,6 @@ export class TripsRepository extends BaseRepository<Trip> {
     ]);
   }
 
-
   // The trip map's summary fields, plus driver and organization for the access check.
   // lean() also skips the incidents autopopulate; the map loads them with its own filtered query.
   findMapTrip(tripId: string | Types.ObjectId): Promise<MapTripRow | null> {
@@ -101,22 +100,12 @@ export class TripsRepository extends BaseRepository<Trip> {
       .exec();
   }
 
-  // The trip dashboard's header fields, with the driver's full name populated.
-  findDashboardHeader(tripId: string | Types.ObjectId): Promise<DashboardHeaderRow | null> {
-    return this.tripModel
-      .findById(tripId)
-      .select('startedAt durationSeconds vehicle driver -_id')
-      .populate({ path: 'driver', select: 'fullName -_id' })
-      .lean<DashboardHeaderRow>()
-      .exec();
-  }
-
-  // Returns the trip's motion signals: steeringWheelAngle, tripSpeeds, accelerations, tripSpeedLimits and tripAccelerations.
+  // Trip Report Dashboard: Returns the trip's motion signals: steeringWheelAngle, tripSpeeds, accelerations, tripSpeedLimits and tripAccelerations.
   async findSpeedMotionGraph(tripId: string | Types.ObjectId) {
     const trip = await this.tripModel
       .findById(tripId)
       .select('tripSpeeds  -_id')
-      .lean<Pick<Trip,  'tripSpeeds'>>()
+      .lean<Pick<Trip, 'tripSpeeds'>>()
       .exec();
     if (!trip) throw new NotFoundException(`Trip ${tripId} not found`);
 
@@ -129,7 +118,7 @@ export class TripsRepository extends BaseRepository<Trip> {
     const trip = await this.tripModel
       .findById(tripId)
       .select('tripAccelerations  -_id')
-      .lean<Pick<Trip,  'tripAccelerations'>>()
+      .lean<Pick<Trip, 'tripAccelerations'>>()
       .exec();
     if (!trip) throw new NotFoundException(`Trip ${tripId} not found`);
 
@@ -142,12 +131,22 @@ export class TripsRepository extends BaseRepository<Trip> {
     const trip = await this.tripModel
       .findById(tripId)
       .select('steeringWheelAngle  -_id')
-      .lean<Pick<Trip,  'steeringWheelAngle'>>()
+      .lean<Pick<Trip, 'steeringWheelAngle'>>()
       .exec();
     if (!trip) throw new NotFoundException(`Trip ${tripId} not found`);
 
     return {
       steerings: trip.steeringWheelAngle ?? [],
     };
+  }
+
+  // Returns Trip Report Dashboard header fields: startedAt, durationSeconds, vehicle and driver.fullName.
+  findDashboardHeader(tripId: string | Types.ObjectId): Promise<DashboardHeaderRow | null> {
+    return this.tripModel
+      .findById(tripId)
+      .select('startedAt durationSeconds vehicle driver -_id')
+      .populate({ path: 'driver', select: 'fullName -_id' })
+      .lean<DashboardHeaderRow>()
+      .exec();
   }
 }

@@ -90,6 +90,9 @@ export class TripsRepository extends BaseRepository<Trip> {
     ]);
   }
 
+  //---------------------------------------------------------------
+  //---------- used by the Trip Map  ----------------
+
   // The trip map's summary fields, plus driver and organization for the access check.
   // lean() also skips the incidents autopopulate; the map loads them with its own filtered query.
   findMapTrip(tripId: string | Types.ObjectId): Promise<MapTripRow | null> {
@@ -99,6 +102,9 @@ export class TripsRepository extends BaseRepository<Trip> {
       .lean<MapTripRow>()
       .exec();
   }
+
+  //---------------------------------------------------------------
+  //---------- used by the Trip Report Dashboard's ----------------
 
   // Trip Report Dashboard: Returns the trip's motion signals: steeringWheelAngle, tripSpeeds, accelerations, tripSpeedLimits and tripAccelerations.
   async findSpeedMotionGraph(tripId: string | Types.ObjectId) {
@@ -148,5 +154,108 @@ export class TripsRepository extends BaseRepository<Trip> {
       .populate({ path: 'driver', select: 'fullName -_id' })
       .lean<DashboardHeaderRow>()
       .exec();
+  }
+
+  //---------------------------------------------------------------
+  //---------- used by the My Progress Dashboard's ----------------
+
+  async averageRecentTripScore(driverId: string | Types.ObjectId, lastN: number) {
+    return await this.tripModel
+      .aggregate<{ _id: null; averageScore: number }>([
+        {
+          $match: {
+            driver: new Types.ObjectId(driverId),
+            status: TripStatus.COMPLETED,
+            score: { $ne: null },
+          },
+        },
+        { $sort: { startedAt: -1 } }, // newest first
+        { $limit: lastN }, // keep only the newest N trips
+        {
+          $group: {
+            _id: null,
+            averageScore: { $avg: '$score' },
+          },
+        },
+      ])
+      .exec();
+  }
+
+  async averageLastTripScore(driverId: string | Types.ObjectId, lastN: number) {
+    return await this.tripModel
+      .aggregate<{ _id: null; averageScore: number }>([
+        {
+          $match: {
+            driver: new Types.ObjectId(driverId),
+            status: TripStatus.COMPLETED,
+            score: { $ne: null },
+          },
+        },
+        { $sort: { startedAt: 1 } }, // oldest first
+        { $limit: lastN }, // keep only the newest N trips
+        {
+          $group: {
+            _id: null,
+            averageScore: { $avg: '$score' },
+          },
+        },
+      ])
+      .exec();
+  }
+
+  async averageLongTermScore(driverId: string | Types.ObjectId) {
+    return await this.tripModel
+      .aggregate<{ _id: null; averageScore: number }>([
+        {
+          $match: {
+            driver: new Types.ObjectId(driverId),
+            status: TripStatus.COMPLETED,
+          },
+        },
+        {
+          $group: { _id: null, averageScore: { $avg: '$score' } },
+        },
+      ])
+      .exec();
+  }
+
+  async bestTripScore(driverId: string | Types.ObjectId) {
+    return await this.tripModel
+      .aggregate<{ _id: null; bestScore: number }>([
+        {
+          $match: {
+            driver: new Types.ObjectId(driverId),
+            status: TripStatus.COMPLETED,
+          },
+        },
+        {
+          $group: { _id: null, bestScore: { $max: '$score' } },
+        },
+      ])
+      .exec();
+  }
+
+  async progressGraph(driverId: string | Types.ObjectId) {
+    return this.tripModel.aggregate([
+      { $match: { driver: new Types.ObjectId(driverId), status: TripStatus.COMPLETED, score: { $ne: null } } },
+      { $sort: { date: 1 } },
+      {
+        $group: {
+          _id: null,
+          trips: {
+            $push: {
+              date: '$startedAt',
+              score: '$score',
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          trips: 1,
+        },
+      },
+    ]);
   }
 }

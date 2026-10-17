@@ -35,4 +35,25 @@ export class IncidentsController {
   getMyTripIncidents(@Param('tripId', ParseObjectIdPipe) tripId: Types.ObjectId, @Query() limit: number) {
     return this.incidentsService.getTopIncidentsForTrip(tripId, limit);
   }
+
+
+  @AllowedRoles([UserRole.DRIVER])
+  @ApiParam({ name: 'driverId', type: String, example: '665f1c2e8b3e4a1d2c9f0a12' })
+  @ApiOperation({ summary: "A trip's incidents count, grouped by type" })
+  @ApiResponse({ status: 400, description: 'Invalid driver id' })
+  @Get('/tripIncidentsCount/:driverId')
+  /*Progress Dashboard This function is used to get incidents that happened during a particular trip, and group them by type*/
+  getMyTripIncidentsCount(@Param('driverId', ParseObjectIdPipe) driverId: Types.ObjectId) {
+    return this.incidentsService.getAllIncidentsForTrip(driverId);
+  }
+
+  @AllowedRoles([UserRole.DRIVER])
+  @ApiParam({ name: 'driverId', type: String, example: '665f1c2e8b3e4a1d2c9f0a12' })
+  @ApiOperation({ summary: "A trip's incidents count, grouped by type" })
+  @ApiResponse({ status: 400, description: 'Invalid driver id' })
+  @Get('/eventMix/:driverId')
+  /*Progress Dashboard This function is used to get incidents that happened during a particular trip, and group them by type*/
+  getMyEventMix(@Param('driverId', ParseObjectIdPipe) driverId: Types.ObjectId) {
+    return this.incidentsService.getEventMix(driverId);
+  }
 }

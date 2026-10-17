@@ -168,4 +168,17 @@ export class TripsController {
   getIncidentAnalysis(@Param('tripId', ParseObjectIdPipe) tripId: Types.ObjectId) {
     return this.tripsService.incidentAnalysis(tripId);
   }
+
+  //---------- Used By the My Progress Dashboard's ----------------
+  @ApiParam({ name: 'driverId', type: String, example: '665f1c2e8b3e4a1d2c9f0a12' })
+  @Get('progressDetails/:driverId')
+  progressComponentData(@Param('driverId', ParseObjectIdPipe) driverId: string,) {
+    return this.tripsService.progressComponentsData(driverId);
+  }
+
+  @ApiParam({ name: 'driverId', type: String, example: '665f1c2e8b3e4a1d2c9f0a12' })
+  @Get('progressGraph/:driverId')
+  progressGraph(@Param('driverId', ParseObjectIdPipe) driverId: string,) {
+    return this.tripsService.progressGraph(driverId);
+  }
 }

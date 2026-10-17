@@ -37,7 +37,28 @@ export class IncidentsService {
       data: { incidents },
     };
   }
+  //--------------------------------------------------
+  //---------- used by the Progress Dashboard's ----------------
+  
+  //gets all points lost for driver regarding his overall history, inorder to generate component ' Where points are lost '
+  async getAllIncidentsForTrip(driverId:string | Types.ObjectId){
+    const incidents = await this.incidentsRepository.sumDeductionsByType(driverId);
+    return {
+      message: 'All incidents for trip',
+      data: { incidents },
+    };
+  }
 
+  //gets the all event counts for driver regarding his overall history, inorder to generate chart
+  async getEventMix(driverId:string | Types.ObjectId){
+    const incidents = await this.incidentsRepository.countIncidentsByType(driverId);
+    return{
+      message: 'All Event Mix',
+      data: {incidents}
+    }
+  }
+
+  //--------------------------------------------------
 
   // ---------- used by other modules ----------
 
@@ -45,4 +66,5 @@ export class IncidentsService {
   findByTrip(tripId: Types.ObjectId, filter?: TripIncidentFilter): Promise<TripIncidentRow[]> {
     return this.incidentsRepository.findByTrip(tripId, filter);
   }
+
 }

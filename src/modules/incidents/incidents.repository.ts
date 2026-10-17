@@ -47,4 +47,37 @@ export class IncidentsRepository extends BaseRepository<Incident> {
       .lean<TripIncidentRow[]>()
       .exec();
   }
+
+  //---------- used by the Progress Dashboard's ----------------
+  // Progress Dashboard: A driver's incidents, grouped by type, with the count and total points deducted for each type
+  /// A driver's incidents, grouped by type, with the count and total points deducted for each type
+  sumDeductionsByType(driverId: string | Types.ObjectId) {
+    return this.incidentModel
+      .aggregate<{ _id: IncidentType; count: number; totalDeduction: number }>([
+        { $match: { driver: new Types.ObjectId(driverId) } },
+        {
+          $group: {
+            _id: '$type',
+            count: { $sum: 1 },
+            totalDeduction: { $sum: '$pointsDeducted' },
+          },
+        },
+        {
+          $project: {
+            count: 1,
+            totalDeduction: { $round: ['$totalDeduction', 0] },
+          },
+        },
+      ])
+      .exec();
+  }
+
+  async countIncidentsByType(driverId: string | Types.ObjectId) {
+    return await this.incidentModel
+      .aggregate<{ _id: IncidentType; count: number }>([
+        { $match: { driver: new Types.ObjectId(driverId) } },
+        { $group: { _id: '$type', count: { $sum: 1 } } },
+      ])
+      .exec();
+  }
 }

@@ -3,7 +3,7 @@ import { Incident } from '@modules/incidents/incidents.model';
 import { Organization } from '@modules/organizations/organization.model';
 import { User } from '@modules/users/user.model';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, Types } from 'mongoose';
 import { riskForScore } from './trip-scoring';
 
 export type TripDocument = HydratedDocument<Trip>;
@@ -106,6 +106,8 @@ export class Trip {
 
   @Prop({ type: TripAcclerations, default: [] })
   tripAccelerations?: TripAcclerations[];
+
+
 }
 
 export const TripSchema = SchemaFactory.createForClass(Trip);

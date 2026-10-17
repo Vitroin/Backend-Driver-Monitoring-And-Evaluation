@@ -157,7 +157,7 @@ export class TripsService {
     const trip = await this.tripsRepository.findById(tripId.toString());
     if (!trip) throw new NotFoundException('Trip not found');
 
-    const incidents = await this.incidentsService.findByTrip(tripId); 
+    const incidents = await this.incidentsService.findByTrip(tripId);
     const analysis = Object.values(IncidentType).map((incidentType) => {
       const ofType = incidents.filter((incident) => incident.type === incidentType);
       return {
@@ -219,5 +219,43 @@ export class TripsService {
     return this.tripsRepository.filterTrips(driverId, dto);
   }
 
+  //--------------------------------------------------------
+  // ---------- used by the My Progress Dashboard ----------
+  async averageRecentTripScore(driverId: string) {
+    return this.tripsRepository.averageRecentTripScore(driverId, 5);
+  }
 
+  // Average of the last 5 scored trips minus the first scored trip; null until the driver has one
+  async changeSinceStart(driverId: string) {
+    const [recent] = await this.tripsRepository.averageRecentTripScore(driverId, 5);
+    const [first] = await this.tripsRepository.averageLastTripScore(driverId, 5);
+
+    const change = recent && first ? roundToOneDecimal(recent.averageScore - first.averageScore) : null;
+    return { message: 'Change since start', data: { change } };
+  }
+
+  async progressComponentsData(driverId: string) {
+    const [recent] = await this.tripsRepository.averageRecentTripScore(driverId, 5);
+    const changeSinceStart = await this.changeSinceStart(driverId);
+    const longTermAverage = await this.tripsRepository.averageLongTermScore(driverId);
+    const bestTrip = await this.tripsRepository.bestTripScore(driverId);
+
+    return {
+      message: 'Progress components data',
+      data: {
+        recentAverage: recent?.averageScore ?? null,
+        changeSinceStart: changeSinceStart,
+        longTermAverage: longTermAverage ?? null,
+        bestTrip: bestTrip ?? null,
+      },
+    };
+  }
+
+  async progressGraph(driverId: string) {
+    const graphData = await this.tripsRepository.progressGraph(driverId);
+    return {
+      message: 'Progress graph data',
+      data: graphData
+    }
+  }
 }

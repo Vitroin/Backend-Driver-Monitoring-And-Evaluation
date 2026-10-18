@@ -20,9 +20,8 @@ import {
   type SpeedPointDto,
   type SteeringPointDto,
   type TripOverallDto,
-  type TripTotalsDto
+  type TripTotalsDto,
 } from './response';
-import { ScoreOverviewDto, scoreOverviewSchema } from './response/score-overview.response';
 import { TripsService } from './trips.service';
 import { tripsFilterSchema, type TripsFilterDto } from './trips_filter.dto';
 
@@ -32,7 +31,6 @@ import { tripsFilterSchema, type TripsFilterDto } from './trips_filter.dto';
 export class TripsController {
   constructor(private readonly tripsService: TripsService) {}
 
-  
   @ApiParam({ name: 'driverId', type: String, example: '665f1c2e8b3e4a1d2c9f0a12' })
   @ApiOperation({
     summary: "A driver's trips matching the filters, newest first and paginated, each with its incidents",
@@ -40,13 +38,11 @@ export class TripsController {
   @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(filteredTripSchema.array()) })
   @Get('filteredTrips/:driverId')
   getFilteredTrips(
-    @Param('driverId', ParseObjectIdPipe) driverId: Types.ObjectId,
+    @Param('driverId', ParseObjectIdPipe) driverId: string,
     @Query({ schema: tripsFilterSchema }) dto: TripsFilterDto,
   ) {
     return this.tripsService.filterTrips(driverId, dto);
   }
-
-
 
   @ApiParam({ name: 'tripId', type: String, example: '6ad24e609609bf3649c97cdf' })
   @ApiOperation({ summary: "A trip's overall stats: duration, distance, speeds, event count, score and risk" })
@@ -57,16 +53,16 @@ export class TripsController {
     return this.tripsService.getTripOverall(tripId);
   }
 
-
   @ApiParam({ name: 'tripId', type: String, example: '6ad24e609609bf3649c97cdf' })
   @ApiOperation({ summary: "A trip's detected events: type, severity, time and points deducted" })
   @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(detectedEventSchema.array()) })
   @ApiResponse({ status: 400, description: 'Invalid trip id' })
   @Get('detectedEvents/:tripId')
-  getDetectedEvents(@Param('tripId', ParseObjectIdPipe) tripId: Types.ObjectId): Promise<DataResponseDto<DetectedEventDto[]>> {
-    return this.tripsService.getDetectedEvents(tripId);
+  getDetectedEvents(
+    @Param('tripId', ParseObjectIdPipe) tripId: Types.ObjectId,
+  ): Promise<DataResponseDto<DetectedEventDto[]>> {
+    return this.tripsService.getTripDetectedEvents(tripId);
   }
-
 
   @ApiParam({ name: 'tripId', type: String, example: '6ad24e609609bf3649c97cdf' })
   @ApiOperation({ summary: "A trip's speed over time, for the speed motion graph" })
@@ -74,10 +70,11 @@ export class TripsController {
   @ApiResponse({ status: 400, description: 'Invalid trip id' })
   @ApiResponse({ status: 404, description: 'Trip not found' })
   @Get('speedMotionGraph/:tripId')
-  getSpeedMotionGraph(@Param('tripId', ParseObjectIdPipe) tripId: Types.ObjectId): Promise<DataResponseDto<SpeedPointDto[]>> {
+  getSpeedMotionGraph(
+    @Param('tripId', ParseObjectIdPipe) tripId: Types.ObjectId,
+  ): Promise<DataResponseDto<SpeedPointDto[]>> {
     return this.tripsService.getSpeedMotionGraph(tripId);
   }
-
 
   @ApiParam({ name: 'tripId', type: String, example: '6ad24e609609bf3649c97cdf' })
   @ApiOperation({ summary: "A trip's acceleration over time, for the acceleration motion graph" })
@@ -91,7 +88,6 @@ export class TripsController {
     return this.tripsService.getAccelerationMotionGraph(tripId);
   }
 
-
   @ApiParam({ name: 'tripId', type: String, example: '6ad24e609609bf3649c97cdf' })
   @ApiOperation({ summary: "A trip's steering wheel angle over time, for the steering motion graph" })
   @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(steeringPointSchema.array()) })
@@ -103,7 +99,7 @@ export class TripsController {
   ): Promise<DataResponseDto<SteeringPointDto[]>> {
     return this.tripsService.getSteeringMotionGraph(tripId);
   }
-  
+
   @ApiOperation({
     summary: "The logged-in driver's totals over completed trips: trip count, distance and driving time",
   })
@@ -113,8 +109,6 @@ export class TripsController {
   getMyTotals(@CurrentUser('id') driverId: string): Promise<DataResponseDto<TripTotalsDto>> {
     return this.tripsService.getTotals(driverId);
   }
-
-
 
   @ApiOperation({ summary: "The logged-in driver's 6 latest trips, planned ones included" })
   @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(recentTripSchema.array()) })
@@ -129,7 +123,7 @@ export class TripsController {
   getTripDashboardHeader(@Param('tripId', ParseObjectIdPipe) tripId: Types.ObjectId) {
     return this.tripsService.getTripDashboardHeader(tripId);
   }
-  
+
   @ApiParam({ name: 'tripId', type: String, example: '6ad24e609609bf3649c97cdf' })
   @Get('incidentsCount/:tripId')
   getIncidentsCount(@Param('tripId', ParseObjectIdPipe) tripId: Types.ObjectId) {
@@ -141,7 +135,7 @@ export class TripsController {
   getTripStatistics(@Param('tripId', ParseObjectIdPipe) tripId: Types.ObjectId) {
     return this.tripsService.getTripStatistics(tripId);
   }
-  
+
   @ApiParam({ name: 'tripId', type: String, example: '6ad24e609609bf3649c97cdf' })
   @Get('incidentAnalysis/:tripId')
   getIncidentAnalysis(@Param('tripId', ParseObjectIdPipe) tripId: Types.ObjectId) {
@@ -151,13 +145,13 @@ export class TripsController {
   //---------- Used By the My Progress Dashboard's ----------------
   @ApiParam({ name: 'driverId', type: String, example: '665f1c2e8b3e4a1d2c9f0a12' })
   @Get('progressDetails/:driverId')
-  progressComponentData(@Param('driverId', ParseObjectIdPipe) driverId: string,) {
+  progressComponentData(@Param('driverId', ParseObjectIdPipe) driverId: string) {
     return this.tripsService.progressComponentsData(driverId);
   }
 
   @ApiParam({ name: 'driverId', type: String, example: '665f1c2e8b3e4a1d2c9f0a12' })
   @Get('progressGraph/:driverId')
-  progressGraph(@Param('driverId', ParseObjectIdPipe) driverId: string,) {
+  progressGraph(@Param('driverId', ParseObjectIdPipe) driverId: string) {
     return this.tripsService.progressGraph(driverId);
   }
 }

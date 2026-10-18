@@ -52,7 +52,7 @@ export class TripsService {
     };
   }
 
-  async getDetectedEvents(tripId: Types.ObjectId): Promise<DataResponseDto<DetectedEventDto[]>> {
+  async getTripDetectedEvents(tripId: Types.ObjectId): Promise<DataResponseDto<DetectedEventDto[]>> {
     const incidents = await this.incidentsService.findByTrip(tripId);
     return {
       message: 'Detected events',
@@ -159,6 +159,7 @@ export class TripsService {
   // ---------- used by the Main Dashboard ----------
   // Long-term score ring + "Score over time" chart
 
+  // Returns 
   async getTotals(driverId: string): Promise<DataResponseDto<TripTotalsDto>> {
     const [totals, [lastTrip], [recentAverage]] = await Promise.all([
       this.tripsRepository.getTotals(driverId),
@@ -172,7 +173,7 @@ export class TripsService {
 
     return { message: 'Trip totals', data: { ...totals, lastTripScore, difference } };
   }
-  
+
   async getRecentTrips(driverId: string): Promise<DataResponseDto<RecentTripDto[]>> {
     const trips = await this.tripsRepository.findRecentTrip(driverId, RECENT_TRIPS_LIST_SIZE);
     return {
@@ -189,7 +190,7 @@ export class TripsService {
     };
   }
 
-  filterTrips(driverId: Types.ObjectId, dto: TripsFilterDto) {
+  filterTrips(driverId: string, dto: TripsFilterDto) {
     return this.tripsRepository.filterTrips(driverId, dto);
   }
 
@@ -223,6 +224,10 @@ export class TripsService {
         bestTrip: bestTrip ?? null,
       },
     };
+  }
+
+  async averageLongTermScore(driverId: string) {
+    return this.tripsRepository.averageLongTermScore(driverId);
   }
 
   async progressGraph(driverId: string) {

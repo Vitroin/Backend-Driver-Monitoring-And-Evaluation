@@ -21,33 +21,33 @@ export class NotificationsService {
     }
   }
 
-  findAllUserNotifications(uerId: string) {
-    const notifications = this.notificationsRepository.findNotificationsByUserId('userId'); // Replace 'userId' with the actual user ID
+  async findAllUserNotifications(userId: string) {
+    const notifications = await this.notificationsRepository.findNotificationsByUserId(userId);
     if (!notifications) {
       return { message: 'No notifications found for the user', data: [] };
     }
     return { message: 'Notifications retrieved successfully', data: notifications };
   }
 
-  findAllUnreadUserNotifications(userId: string) {
-    const unreadNotifications = this.notificationsRepository.findUnreadNotificationsByUserId(userId);
+  async findAllUnreadUserNotifications(userId: string) {
+    const unreadNotifications = await this.notificationsRepository.findUnreadNotificationsByUserId(userId);
     if (!unreadNotifications) {
       return { message: 'No unread notifications found for the user', data: [] };
     }
     return { message: 'Unread notifications retrieved successfully', data: unreadNotifications };
   }
 
-  markNotificationAsRead(notificationId: string) {
-    const updatedNotification = this.notificationsRepository.markNotificationAsRead(notificationId);
+  async markNotificationAsRead(notificationId: string, userId: string) {
+    const updatedNotification = await this.notificationsRepository.markNotificationAsRead(notificationId, userId);
     if (!updatedNotification) {
       return { message: 'Notification not found or already marked as read', data: null };
     }
     return { message: 'Notification marked as read successfully', data: updatedNotification };
   }
 
-  markAllNotificationsAsReadForUser(userId: string) {
-    const result = this.notificationsRepository.markAllNotificationsAsReadForUser(userId);
-    if (result === null) {
+  async markAllNotificationsAsReadForUser(userId: string) {
+    const result = await this.notificationsRepository.markAllNotificationsAsReadForUser(userId);
+    if (result.modifiedCount === 0) {
       return { message: 'No unread notifications found for the user', data: null };
     }
     return { message: 'All notifications marked as read successfully', data: result };

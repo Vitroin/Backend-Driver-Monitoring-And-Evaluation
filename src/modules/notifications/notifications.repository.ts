@@ -11,18 +11,21 @@ export class NotificationsRepository extends BaseRepository<Notification> {
   }
 
   async findNotificationsByUserId(userId: string) {
-    return this.notificationModel.find({ userId }).exec();
+    return this.notificationModel.find({ recipient: userId }).sort({ createdAt: -1 }).exec();
   }
 
   async findUnreadNotificationsByUserId(userId: string) {
-    return this.notificationModel.find({ userId, read: false }).exec();
+    return this.notificationModel.find({ recipient: userId, readAt: null }).sort({ createdAt: -1 }).exec();
   }
 
-  async markNotificationAsRead(notificationId: string) {
-    return this.notificationModel.findByIdAndUpdate(notificationId, { read: true }, { new: true }).exec();
+  // recipient so users can't mark someone else's; readAt: null so one that's already read returns null instead of getting a new readAt
+  async markNotificationAsRead(notificationId: string, userId: string) {
+    return this.notificationModel
+      .findOneAndUpdate({ _id: notificationId, recipient: userId, readAt: null }, { readAt: new Date() }, { new: true })
+      .exec();
   }
 
   async markAllNotificationsAsReadForUser(userId: string) {
-    return this.notificationModel.updateMany({ userId, read: false }, { read: true }).exec();
+    return this.notificationModel.updateMany({ recipient: userId, readAt: null }, { readAt: new Date() }).exec();
   }
 }

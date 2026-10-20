@@ -14,6 +14,16 @@ export class UsersService {
     readonly usersFactory: UsersFactory,
   ) {}
 
+  //ToDo Pagination
+  async findAllUsers() {
+    const users = await this.usersRepository.find({}, { fullName: 1, email: 1, username: 1, status: 1, organization: 1, role: 1, createdAt: 1} );
+    return{
+      success: true,
+      message: 'Users retrieved successfully',
+      data: users
+    }
+  }
+
   async updateFullName(id: string, fullName: string): Promise<DataResponseDto<FullNameResponseDto>> {
     const user = await this.usersRepository.updateById(id, { fullName });
     if (!user) throw new NotFoundException('User not found');

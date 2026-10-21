@@ -1,11 +1,12 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { BaseResponseSchema, CurrentUser, Public } from '@common';
 import type { DataResponseDto, MessageResponseDto } from '@common';
 import { objectIdSchema } from '@common/types';
 import { UsersService } from './users.service';
 import { updateFullNameSchema, type UpdateFullNameDto } from './update-full-name.dto';
 import { fullNameResponseSchema, type FullNameResponseDto } from './response/full-name.response';
+import { UserRole } from '@common/enums';
 
 // Every route here acts on the logged in user's own account, whatever their role
 //@ApiBearerAuth()
@@ -13,7 +14,10 @@ import { fullNameResponseSchema, type FullNameResponseDto } from './response/ful
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @ApiOperation({ summary: 'Change the logged in user full name', description: 'The name shown to evaluators and in reports.' })
+  @ApiOperation({
+    summary: 'Change the logged in user full name',
+    description: 'The name shown to evaluators and in reports.',
+  })
   @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(fullNameResponseSchema) })
   @ApiResponse({ status: 400, description: 'Invalid full name' })
   @Patch('me/full-name')
@@ -51,7 +55,13 @@ export class UsersController {
 
   @Public()
   @Get('/getAllUsers')
-  async getAllUsers() {
-    return await this.usersService.findAllUsers();
+  @ApiQuery({
+    name: 'role',
+    enum: UserRole,
+    required: false,
+    description: 'Filter users by role (optional)',
+  })
+  async getAllUsers(@Query('role') role?: UserRole) {
+    return await this.usersService.findAllUsers(role);
   }
 }

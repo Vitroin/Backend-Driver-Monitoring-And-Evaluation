@@ -7,7 +7,6 @@ import { OrganizationsRepository } from './organization.repository';
 export class OrganizationsService {
   constructor(private readonly organizationsRepository: OrganizationsRepository) {}
 
-  createOrganization(createOrganizationDto: CreateOrganizationDto) {}
 
   // Every organization except the given one, by name (the privacy page's "share with" dropdown)
   findAllExcept(organizationId: Types.ObjectId) {
@@ -40,5 +39,9 @@ export class OrganizationsService {
       success: true,
       data: organizations,
     };
+  }
+
+  createOrganization(createOrganizationDto: CreateOrganizationDto) {
+    return "void"
   }
 }

@@ -1,4 +1,5 @@
 import { OrganizationTypes } from '@modules/organizations/organizations.enum';
+import { CreateUserSchema } from '@modules/users/create-user.dto';
 import { z } from 'zod';
 
 export const CreateOrganizationSchema = z.object({
@@ -11,6 +12,11 @@ export const CreateOrganizationSchema = z.object({
   organizationType: z.enum(OrganizationTypes, {
     message: `Organization type must be one of: ${Object.values(OrganizationTypes).join(', ')}`,
   }),
+
+  organizationOwner: z.string().optional(),
+
+  // Owner's user fields, validated the same way as when creating a user
+  ...CreateUserSchema.pick({ fullName: true, email: true, age: true, gender: true}).shape,
 });
 
 export type CreateOrganizationDto = z.infer<typeof CreateOrganizationSchema>;

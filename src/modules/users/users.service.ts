@@ -3,7 +3,7 @@ import { UsersRepository } from './users.repository';
 import { UsersFactory } from './users.factory';
 import { Types } from 'mongoose';
 import { CreateUserDto } from './create-user.dto';
-import { UserStatus } from '@common/enums';
+import { UserRole, UserStatus } from '@common/enums';
 import type { DataResponseDto, MessageResponseDto } from '@common';
 import type { FullNameResponseDto } from './response/full-name.response';
 
@@ -15,13 +15,24 @@ export class UsersService {
   ) {}
 
   //ToDo Pagination
-  async findAllUsers() {
-    const users = await this.usersRepository.find({}, { fullName: 1, email: 1, username: 1, status: 1, organization: 1, role: 1, createdAt: 1} );
-    return{
+  async findAllUsers(role?: UserRole) {
+    const filter = role ? { role } : {};
+
+    const users = await this.usersRepository.find(filter, {
+      fullName: 1,
+      email: 1,
+      username: 1,
+      status: 1,
+      organization: 1,
+      role: 1,
+      createdAt: 1,
+    });
+
+    return {
       success: true,
       message: 'Users retrieved successfully',
-      data: users
-    }
+      data: users,
+    };
   }
 
   async updateFullName(id: string, fullName: string): Promise<DataResponseDto<FullNameResponseDto>> {
@@ -40,7 +51,7 @@ export class UsersService {
   }
 
   /** Returns Enrolled Organizations */
-  async showEnrolledOrganizations(id: string){
+  async showEnrolledOrganizations(id: string) {
     const user = await this.usersRepository.findById(id);
     if (!user) throw new NotFoundException('User not found');
     return user.organization;

@@ -1,14 +1,14 @@
 import { OrganizationTypes } from '@modules/organizations/organizations.enum';
 import { User } from '@modules/users/user.model';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { SchemaTypes, Types } from 'mongoose';
+import { SchemaTypes, Types } from 'mongoose';
 @Schema({ timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } })
 export class Organization {
   @Prop({ required: true })
   name: string;
 
-  @Prop({ required: true, unique: true, index: true })
-  slug: string;
+  // @Prop({ required: true, unique: true, index: true })
+  // slug: string;
 
   @Prop({ type: SchemaTypes.ObjectId, ref: 'User', default: null })
   organizationOwner: Types.ObjectId | null;

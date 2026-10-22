@@ -99,6 +99,10 @@ export class UsersService {
 
   async createUser(dto: CreateUserDto, hashedPassword: string) {
     const user = this.usersFactory.createUser(dto, hashedPassword);
+    // The random part makes a clash unlikely; if one happens, generate another
+    while (await this.usersRepository.exists({ username: user.username })) {
+      user.username = this.usersFactory.generateUsername(dto.email);
+    }
     return this.usersRepository.create(user);
   }
 

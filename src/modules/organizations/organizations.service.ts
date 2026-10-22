@@ -42,6 +42,6 @@ export class OrganizationsService {
   }
 
   createOrganization(createOrganizationDto: CreateOrganizationDto) {
-    return "void"
+    
   }
 }

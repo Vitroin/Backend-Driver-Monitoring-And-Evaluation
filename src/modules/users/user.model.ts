@@ -34,7 +34,7 @@ export class User {
   @Prop({ required: true, lowercase: true })
   email: string;
 
-  @Prop({ type: SchemaTypes.ObjectId, required: true, default: () => new Types.ObjectId() })
+  @Prop({ type: Types.ObjectId, required: true, default: () => new Types.ObjectId() })
   securityStamp: Types.ObjectId;
 
   @Prop({ required: true })
@@ -46,7 +46,7 @@ export class User {
   @Prop({ required: true, type: String, enum: UserStatus, default: UserStatus.WAITING_FOR_ACTIVATION })
   status: UserStatus;
 
-  @Prop({ type: [SchemaTypes.ObjectId], ref: 'Organization' })
+  @Prop({ type: [Types.ObjectId], ref: 'Organization' })
   organization: Types.ObjectId[];
 
   @Prop({ type: String, enum: UserRole, required: true })

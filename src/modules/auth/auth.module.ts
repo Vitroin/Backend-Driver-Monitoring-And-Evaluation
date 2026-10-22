@@ -16,5 +16,6 @@ import { UsersModule } from '@modules/users/users.module';
   imports: [TokenModule, UsersModule, OtpModule, MailModule, HashingModule, TransactionsModule],
   controllers: [AuthController],
   providers: [AuthService, AuthFactory, AuthMailService, { provide: APP_GUARD, useClass: AuthenticationGuard }, { provide: APP_GUARD, useClass: RolesGuard }],
+  exports: [AuthService]
 })
 export class AuthModule {}

@@ -24,6 +24,7 @@ export class OrganizationsController {
 
   @ApiBearerAuth()
   @AllowedRoles([UserRole.SUPER_ADMIN])
+  @Public()
   @ApiOperation({
     summary: 'Create an organization and invite its owner',
     description:

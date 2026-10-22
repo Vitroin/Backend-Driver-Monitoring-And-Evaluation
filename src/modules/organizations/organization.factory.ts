@@ -12,5 +12,4 @@ export class OrganizationsFactory {
     organization.organizationOwner = dto.organizationOwner ? new Types.ObjectId(dto.organizationOwner) : null;
     return organization;
   }
-
 }

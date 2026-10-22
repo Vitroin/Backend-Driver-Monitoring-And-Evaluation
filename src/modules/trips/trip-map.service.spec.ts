@@ -34,7 +34,7 @@ describe('TripMapService', () => {
   const driverId = new Types.ObjectId();
   const organizationId = new Types.ObjectId();
   const tripId = new Types.ObjectId();
-  const driver = { _id: driverId, role: UserRole.DRIVER, organization: organizationId };
+  const driver = { _id: driverId, role: UserRole.DRIVER, organization: [organizationId] };
 
   const trip = {
     _id: tripId,

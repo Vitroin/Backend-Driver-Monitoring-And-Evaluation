@@ -5,9 +5,11 @@ import { Organization, OrganizationSchema } from './organization.model';
 import { MongooseModule } from '@nestjs/mongoose';
 import { OrganizationsRepository } from './organization.repository';
 import { OrganizationsFactory } from './organization.factory';
+import { UsersModule } from '@modules/users/users.module';
+import { TransactionsModule } from '@shared/modules/transactions/transactions.module';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: Organization.name, schema: OrganizationSchema }])],
+  imports: [MongooseModule.forFeature([{ name: Organization.name, schema: OrganizationSchema }]), UsersModule, TransactionsModule],
   controllers: [OrganizationsController],
   providers: [OrganizationsService, OrganizationsRepository, OrganizationsFactory],
   exports: [OrganizationsService],

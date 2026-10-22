@@ -35,8 +35,7 @@ const CONFIG = {
   tripsPerDriver: { min: 3, max: 6 },
   incidentsPerTrip: { min: 0, max: 8 },
   defaultPassword: 'Password123!',
-  emailDomain: 'sdems.dev', // used to identify (and clean up) seeded users
-  slugPrefix: 'seed-', // used to identify (and clean up) seeded organizations
+  emailDomain: 'sdems.dev', // used to identify (and clean up) seeded users, and the organizations they own
   firstTripCode: 90000, // seeded trips get T-90000, T-90001, ... to stay clear of real codes
 };
 
@@ -105,7 +104,7 @@ async function seed() {
         tripModel.deleteMany({ driver: { $in: seededUserIds } }),
         incidentModel.deleteMany({ driver: { $in: seededUserIds } }),
         userModel.deleteMany({ _id: { $in: seededUserIds } }),
-        organizationModel.deleteMany({ slug: { $regex: `^${CONFIG.slugPrefix}` } }),
+        organizationModel.deleteMany({ organizationOwner: { $in: seededUserIds } }),
       ]);
       console.log('Cleared seeded organizations, users, trips and incidents');
     }
@@ -114,14 +113,12 @@ async function seed() {
     const school = {
       _id: oid(),
       name: 'Seed Driving School',
-      slug: `${CONFIG.slugPrefix}driving-school`,
       organizationType: OrganizationTypes.DRIVING_SCHOOL,
       organizationOwner: null as Types.ObjectId | null,
     };
     const fleet = {
       _id: oid(),
       name: 'Seed Fleet Company',
-      slug: `${CONFIG.slugPrefix}fleet-company`,
       organizationType: OrganizationTypes.FLEET_COMPANY,
       organizationOwner: null as Types.ObjectId | null,
     };

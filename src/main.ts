@@ -1,12 +1,14 @@
 import { swaggerSetup } from '@Core';
 import { NestFactory } from '@nestjs/core';
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  swaggerSetup(app); 
-  
-  await app.listen(process.env.PORT ?? 3000);
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter());
+  swaggerSetup(app);
+
+  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
+  app;
 }
 
 bootstrap();

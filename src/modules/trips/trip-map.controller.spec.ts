@@ -1,9 +1,9 @@
-import { INestApplication, StandardSchemaValidationPipe } from '@nestjs/common';
+import { StandardSchemaValidationPipe } from '@nestjs/common';
 import { APP_GUARD, APP_PIPE } from '@nestjs/core';
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import request from 'supertest';
-import type { App } from 'supertest/types';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IncidentType, TripStatus, UserRole, UserStatus } from '@common/enums';
 import { AuthenticationGuard } from '@modules/auth/guards/authentication.guard';
@@ -21,7 +21,7 @@ async function* stream<T>(items: T[]) {
 
 // HTTP-level: the real AuthenticationGuard, validation pipe, controller and service, with the database mocked out
 describe('TripMapController (HTTP)', () => {
-  let app: INestApplication<App>;
+  let app: NestFastifyApplication;
 
   const organizationId = new Types.ObjectId();
   const tripId = new Types.ObjectId();
@@ -84,8 +84,9 @@ describe('TripMapController (HTTP)', () => {
       ],
     }).compile();
 
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
     await app.init();
+    await app.getHttpAdapter().getInstance().ready();
   });
 
   afterAll(() => app.close());

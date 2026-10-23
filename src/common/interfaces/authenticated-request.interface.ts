@@ -1,5 +1,5 @@
 import type { UserDocument } from '@modules/users/user.model';
-import type { Request } from 'express';
+import type { FastifyRequest } from 'fastify';
 
 export interface RequestSession {
   sid: string;
@@ -7,7 +7,7 @@ export interface RequestSession {
   exp: number;
 }
 
-export interface AuthenticatedRequest extends Request {
+export interface AuthenticatedRequest extends FastifyRequest {
   user: UserDocument;
   session: RequestSession;
 }

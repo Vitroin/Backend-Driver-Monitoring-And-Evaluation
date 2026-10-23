@@ -97,6 +97,10 @@ export class UsersService {
     });
   }
 
+  findDriverInOrganization(driverId: string, organizationId: string) {
+    return this.usersRepository.findOne({ _id: driverId, organization: organizationId, role: UserRole.DRIVER });
+  }
+
   async createUser(dto: CreateUserDto, hashedPassword: string) {
     const user = this.usersFactory.createUser(dto, hashedPassword);
     // The random part makes a clash unlikely; if one happens, generate another

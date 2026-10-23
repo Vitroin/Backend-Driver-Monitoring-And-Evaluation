@@ -18,6 +18,12 @@ export const organizationListResponseSchema = z.object({
   data: organizationResponseSchema.array(),
 });
 
+// Inviting an employee returns only a confirmation, no data
+export const employeeInvitedResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string().meta({ example: 'Employee invited successfully' }),
+});
+
 // The created organization is returned whole, so it also has updatedAt and Mongoose's version key
 export const createdOrganizationResponseSchema = z.object({
   success: z.boolean(),

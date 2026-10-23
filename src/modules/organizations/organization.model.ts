@@ -18,7 +18,10 @@ export class Organization {
   @Prop({ type: String, enum: OrganizationTypes })
   organizationType: OrganizationTypes;
 
+
   organizationDrivers?: User[];
+
+  organizationEmployees?: User[];
 }
 
 
@@ -39,6 +42,14 @@ OrganizationSchema.virtual('organizationDrivers', {
   ref: User.name,
   localField: '_id',
   foreignField: 'User',
+  options: { sort: { occurredAt: 1 } },
+  autopopulate: true,
+});
+
+OrganizationSchema.virtual('organizationEmployees', {
+  ref: User.name,
+  localField: '_id',
+  foreignField: 'organization',
   options: { sort: { occurredAt: 1 } },
   autopopulate: true,
 });

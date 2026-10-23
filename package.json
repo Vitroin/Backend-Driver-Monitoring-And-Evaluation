@@ -8,6 +8,8 @@
   "scripts": {
     "seed": "nest build && node dist/database/scripts/seed.js",
     "seed:fresh": "nest build && node dist/database/scripts/seed.js --fresh",
+    "seed:organizations": "nest build && node dist/database/scripts/seed-organizations.js",
+    "seed:organizations:fresh": "nest build && node dist/database/scripts/seed-organizations.js --fresh",
     "seed:super-admin": "bun src/database/scripts/seed-super-admin.ts",
     "build": "nest build",
     "deploy": "nest deploy",

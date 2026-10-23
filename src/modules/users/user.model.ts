@@ -46,8 +46,8 @@ export class User {
   @Prop({ required: true, type: String, enum: UserStatus, default: UserStatus.WAITING_FOR_ACTIVATION })
   status: UserStatus;
 
-  @Prop({ type: [Types.ObjectId], ref: 'Organization' })
-  organization: Types.ObjectId[];
+  @Prop({ type: Types.ObjectId, ref: 'Organization' })
+  organization: Types.ObjectId;
 
   @Prop({ type: String, enum: UserRole, required: true })
   role: UserRole;

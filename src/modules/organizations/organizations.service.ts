@@ -1,13 +1,15 @@
-import { ConflictException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { ConflictException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { mongo, Types } from 'mongoose';
 import { AuthService } from '@modules/auth/auth.service';
 import { UsersService } from '@modules/users/users.service';
 import { TransactionService } from '@shared/modules/transactions/transactions.service';
 import { CreateOrganizationDto } from './dtos/create-organization.dto';
+import { InviteEmployeeDto } from './dtos/invite-employee.dto';
 import { OrganizationsRepository } from './organization.repository';
 import { OrganizationsFactory } from './organization.factory';
-import { OWNER_ROLES } from './organizations.enum';
+import { EMPLOYEE_ROLES, OWNER_ROLES } from './organizations.enum';
+import { UserRole } from '@common/enums';
 
 @Injectable()
 export class OrganizationsService {
@@ -82,5 +84,34 @@ export class OrganizationsService {
       if (!(error instanceof mongo.MongoServerError) || error.code !== 11000) throw error;
       throw new ConflictException('Organization already exists');
     }
+  }
+
+  /** Creates invites an employee into the organization */
+  async inviteEmployee(organizationId: string, dto: InviteEmployeeDto){
+    const organization = await this.organizationsRepository.findById(organizationId);
+    if(!organization) throw new NotFoundException('Organization not found');
+    await this.authService.inviteUser({
+      ...dto,
+      role: EMPLOYEE_ROLES[organization.organizationType],
+      organization: organizationId
+    });
+    return {
+      success: true,
+      message: 'Employee invited successfully'
+    }
+  }
+
+  //Will be used by Super_Admin to assign an owner to an organization. This is useful when the organization is created without an owner and the SuperAdmin wants to assign one later.
+  async assignOrganizationOwner(organizationId: string, ownerId: string) {
+    const organization = await this.organizationsRepository.findById(organizationId);
+    if (!organization) throw new NotFoundException('Organization not found');
+    const owner = await this.usersService.findById(ownerId);
+    if (!owner) throw new NotFoundException('Owner not found');
+    organization.organizationOwner = owner._id;
+    await organization.save();
+    return {
+      success: true,
+      message: 'Organization owner assigned successfully',
+    };
   }
 }

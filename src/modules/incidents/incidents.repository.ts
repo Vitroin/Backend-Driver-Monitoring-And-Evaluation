@@ -72,6 +72,7 @@ export class IncidentsRepository extends BaseRepository<Incident> {
       .exec();
   }
 
+  // A driver's incidents, grouped by type, with the count for each type
   async countIncidentsByType(driverId: string | Types.ObjectId) {
     return await this.incidentModel
       .aggregate<{ _id: IncidentType; count: number }>([
@@ -79,5 +80,14 @@ export class IncidentsRepository extends BaseRepository<Incident> {
         { $group: { _id: '$type', count: { $sum: 1 } } },
       ])
       .exec();
+  }
+
+  // All drivers' incidents, grouped by type, with the count for each type since a given date
+  async countByTypeSince(since: Date) {
+    return this.incidentModel.aggregate<{ _id: IncidentType; count: number }>([
+      { $match: { occurredAt: { $gte: since } } },
+      { $group: { _id: '$type', count: { $sum: 1 } } },
+    ])
+    .exec();
   }
 }

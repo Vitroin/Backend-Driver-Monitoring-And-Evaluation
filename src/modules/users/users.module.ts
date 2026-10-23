@@ -6,7 +6,7 @@ import { User, UserSchema } from './user.model';
 import { UsersRepository } from './users.repository';
 import { UsersFactory } from './users.factory';
 import { UserRole } from '@common/enums';
-import { Driver, DriverSchema } from '@modules/drivers/driver.model';
+import { Instructor, InstructorSchema } from '@modules/instructors/instructors.model';
 
 @Module({
   imports: [
@@ -14,7 +14,7 @@ import { Driver, DriverSchema } from '@modules/drivers/driver.model';
       {
         name: User.name,
         schema: UserSchema,
-        discriminators: [{ name: Driver.name, schema: DriverSchema, value: UserRole.DRIVER }],
+        discriminators: [{ name: Instructor.name, schema: InstructorSchema, value: UserRole.DRIVER_INSTRUCTOR }],
       },
     ]),
   ],

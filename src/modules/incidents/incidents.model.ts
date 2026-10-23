@@ -69,8 +69,5 @@ export class Incident {
 
 export const IncidentSchema = SchemaFactory.createForClass(Incident);
 
-// Trip report: all incidents of a trip in chronological order
-IncidentSchema.index({ trip: 1, occurredAt: 1 });
-
 // Driver history: a driver's incidents across trips, newest first
 IncidentSchema.index({ driver: 1, occurredAt: -1 });

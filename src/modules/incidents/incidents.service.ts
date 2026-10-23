@@ -3,15 +3,23 @@ import { Injectable } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { IncidentsRepository, type TripIncidentFilter, type TripIncidentRow } from './incidents.repository';
 import type { SignificantEventDto } from './response/significant-event.response';
+import { CacheService } from '@infrastructure/cache';
+import { IncidentType } from '@common/enums';
 
 // "Most significant events": the 5 incidents that cost the most points in the last 60 days
 const SIGNIFICANT_EVENTS_DAYS = 60;
 const SIGNIFICANT_EVENTS_LIMIT = 5;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+const WINDOW_DAYS = 21;
+const TYPE_COUNTS_KEY = 'incidents:type-counts:21d';
+
 @Injectable()
 export class IncidentsService {
-  constructor(private readonly incidentsRepository: IncidentsRepository) {}
+  constructor(
+    private readonly incidentsRepository: IncidentsRepository,
+    private readonly cacheService: CacheService,
+  ) {}
 
   // Used in the Main Dashboard: the 5 incidents that cost the most points in the last 60 days
   async getIncidents(driverId: string): Promise<DataResponseDto<SignificantEventDto[]>> {
@@ -39,9 +47,9 @@ export class IncidentsService {
   }
   //--------------------------------------------------
   //---------- used by the Progress Dashboard's ----------------
-  
+
   //gets all points lost for driver regarding his overall history, inorder to generate component ' Where points are lost '
-  async getAllIncidentsForTrip(driverId:string | Types.ObjectId){
+  async getAllIncidentsForTrip(driverId: string | Types.ObjectId) {
     const incidents = await this.incidentsRepository.sumDeductionsByType(driverId);
     return {
       message: 'All incidents for trip',
@@ -50,12 +58,12 @@ export class IncidentsService {
   }
 
   //gets the all event counts for driver regarding his overall history, inorder to generate chart
-  async getEventMix(driverId:string | Types.ObjectId){
+  async getEventMix(driverId: string | Types.ObjectId) {
     const incidents = await this.incidentsRepository.countIncidentsByType(driverId);
-    return{
+    return {
       message: 'All Event Mix',
-      data: {incidents}
-    }
+      data: { incidents },
+    };
   }
 
   //--------------------------------------------------
@@ -67,4 +75,13 @@ export class IncidentsService {
     return this.incidentsRepository.findByTrip(tripId, filter);
   }
 
+  async getRecentTypeCounts() {
+    const cached = await this.cacheService.get<{ _id: IncidentType; count: number }[]>(TYPE_COUNTS_KEY);
+    if (cached) return cached;
+
+    const since = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    const counts = await this.incidentsRepository.countByTypeSince(since);
+    await this.cacheService.set({ key: TYPE_COUNTS_KEY, value: counts, ttl: 10 * 60 });
+    return counts;
+  }
 }

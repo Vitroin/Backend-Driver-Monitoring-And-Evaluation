@@ -16,7 +16,7 @@ import { Model, Types } from 'mongoose';
 import { faker } from '@faker-js/faker';
 import * as argon2 from 'argon2';
 import { User } from '@modules/users/user.model';
-import { Driver } from '@modules/drivers/driver.model';
+import { Instructor } from '@modules/instructors/instructors.model';
 import { Organization } from '@modules/organizations/organization.model';
 import { OrganizationTypes } from '@modules/organizations/organizations.enum';
 import { Trip } from '@modules/trips/trips.model';
@@ -88,7 +88,7 @@ async function seed() {
 
   const organizationModel = app.get<Model<Organization>>(getModelToken(Organization.name));
   const userModel = app.get<Model<User>>(getModelToken(User.name));
-  const driverModel = app.get<Model<Driver>>(getModelToken(Driver.name));
+  const instructorModel = app.get<Model<Instructor>>(getModelToken(Instructor.name));
   const tripModel = app.get<Model<Trip>>(getModelToken(Trip.name));
   const incidentModel = app.get<Model<Incident>>(getModelToken(Incident.name));
 
@@ -126,29 +126,28 @@ async function seed() {
     // ---------------- Users ----------------
     const passwordHash = await argon2.hash(CONFIG.defaultPassword);
 
-    const instructors = Array.from({ length: CONFIG.instructors }, (_, i) =>
-      mkUser(UserRole.DRIVER_INSTRUCTOR, `instructor${i + 1}@${CONFIG.emailDomain}`, school._id, passwordHash),
-    );
+    const instructors = Array.from({ length: CONFIG.instructors }, (_, i) => ({
+      ...mkUser(UserRole.DRIVER_INSTRUCTOR, `instructor${i + 1}@${CONFIG.emailDomain}`, school._id, passwordHash),
+      drivingStudents: [] as Types.ObjectId[],
+    }));
     const analysts = Array.from({ length: CONFIG.analysts }, (_, i) =>
       mkUser(UserRole.FLEET_ANALYST, `analyst${i + 1}@${CONFIG.emailDomain}`, fleet._id, passwordHash),
     );
     school.organizationOwner = instructors[0]._id;
     fleet.organizationOwner = analysts[0]._id;
 
-    // half the drivers are learners (driving school, with an instructor), half are employees (fleet)
+    // half the drivers are learners (driving school, taught by an instructor), half are employees (fleet)
     const drivers = Array.from({ length: CONFIG.drivers }, (_, i) => {
       const isLearner = i % 2 === 0;
-      return {
-        ...mkUser(UserRole.DRIVER, `driver${i + 1}@${CONFIG.emailDomain}`, isLearner ? school._id : fleet._id, passwordHash),
-        licenseNumber: faker.string.alphanumeric({ length: 10, casing: 'upper' }),
-        instructor: isLearner ? faker.helpers.arrayElement(instructors)._id : null,
-      };
+      const driver = mkUser(UserRole.DRIVER, `driver${i + 1}@${CONFIG.emailDomain}`, isLearner ? school._id : fleet._id, passwordHash);
+      if (isLearner) faker.helpers.arrayElement(instructors).drivingStudents.push(driver._id);
+      return driver;
     });
 
     await organizationModel.insertMany([school, fleet]);
-    await userModel.insertMany([...instructors, ...analysts]);
-    // through the discriminator model so driver-only fields (licenseNumber, instructor) are kept
-    await driverModel.insertMany(drivers);
+    await userModel.insertMany([...analysts, ...drivers]);
+    // through the discriminator model so the instructor-only field (drivingStudents) is kept
+    await instructorModel.insertMany(instructors);
 
     // ---------------- Trips + Incidents ----------------
     const trips: Record<string, unknown>[] = [];

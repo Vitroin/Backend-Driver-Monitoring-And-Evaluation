@@ -1,4 +1,4 @@
-import { AllowedRoles, BaseResponseSchema, CurrentUser, DataResponseDto } from '@common';
+import { AllowedRoles, BaseResponseSchema, CurrentUser, DataResponseDto, Public } from '@common';
 import { UserRole } from '@common/enums';
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
@@ -10,7 +10,7 @@ import { SignificantEventDto, significantEventSchema } from './response/signific
 import { tripIncidentsSchema } from './response/trip-incidents.response';
 
 @ApiBearerAuth()
-@Controller('incidents')
+@Controller('incidents')  
 export class IncidentsController {
   constructor(private readonly incidentsService: IncidentsService) {}
 
@@ -55,5 +55,11 @@ export class IncidentsController {
   /*Progress Dashboard This function is used to get incidents that happened during a particular trip, and group them by type*/
   getMyEventMix(@Param('driverId', ParseObjectIdPipe) driverId: Types.ObjectId) {
     return this.incidentsService.getEventMix(driverId);
+  }
+  
+  @AllowedRoles([UserRole.DRIVER_INSTRUCTOR])
+  @Get('/recentCounts')
+  getRecentCounts(){
+    return this.incidentsService.getRecentTypeCounts();
   }
 }

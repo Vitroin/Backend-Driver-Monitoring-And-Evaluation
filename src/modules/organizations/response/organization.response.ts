@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import { objectIdSchema } from '@common/types';
+import { UserRole, UserStatus } from '@common/enums';
 import { OrganizationTypes } from '../organizations.enum';
 
 export const organizationResponseSchema = z.object({
-  _id: objectIdSchema.meta({ example: '665f1c2e8b3e4a1d2c9f0a12' }),
-  id: objectIdSchema.meta({ description: 'Same as _id', example: '665f1c2e8b3e4a1d2c9f0a12' }),
+  id: objectIdSchema.meta({ example: '665f1c2e8b3e4a1d2c9f0a12' }),
   name: z.string().meta({ example: 'Cairo Driving School' }),
   organizationType: z.enum(OrganizationTypes),
   organizationOwner: objectIdSchema.nullable().meta({ description: "The owner's user id", example: '665f1c2e8b3e4a1d2c9f0a13' }),
@@ -12,23 +12,26 @@ export const organizationResponseSchema = z.object({
 });
 export type OrganizationResponseDto = z.infer<typeof organizationResponseSchema>;
 
-// These routes answer { success, data } rather than the usual { message, data } (BaseResponseSchema)
-export const organizationListResponseSchema = z.object({
-  success: z.boolean(),
-  data: organizationResponseSchema.array(),
+// The whole organization document, as returned when one is created or opened
+export const organizationDetailsSchema = organizationResponseSchema.extend({
+  updatedAt: z.iso.datetime().meta({ example: '2026-10-22T09:30:00.000Z' }),
 });
 
-// Inviting an employee returns only a confirmation, no data
-export const employeeInvitedResponseSchema = z.object({
-  success: z.boolean(),
-  message: z.string().meta({ example: 'Employee invited successfully' }),
+// A driver or employee as listed in their organization: only the fields that are safe to show
+export const organizationMemberSchema = z.object({
+  id: objectIdSchema.meta({ example: '665f1c2e8b3e4a1d2c9f0a14' }),
+  username: z.string().meta({ example: 'jane-doe-k3x9q' }),
+  fullName: z.string().meta({ example: 'Jane Doe' }),
+  email: z.email().meta({ example: 'jane.doe@mail.com' }),
+  role: z.enum(UserRole),
+  status: z.enum(UserStatus),
 });
+export type OrganizationMemberDto = z.infer<typeof organizationMemberSchema>;
 
-// The created organization is returned whole, so it also has updatedAt and Mongoose's version key
-export const createdOrganizationResponseSchema = z.object({
-  success: z.boolean(),
-  data: organizationResponseSchema.extend({
-    updatedAt: z.iso.datetime().meta({ example: '2026-10-22T09:30:00.000Z' }),
-    __v: z.number().meta({ example: 0 }),
-  }),
+// One organization with its drivers and employees
+export const organizationWithMembersSchema = organizationDetailsSchema.extend({
+  organizationDrivers: organizationMemberSchema.array(),
+  organizationEmployees: organizationMemberSchema
+    .array()
+    .meta({ description: 'Everyone in the organization except drivers, the owner included' }),
 });

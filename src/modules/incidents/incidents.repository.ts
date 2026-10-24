@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { Incident } from './incidents.model';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, QueryFilter, SortOrder, Types } from 'mongoose';
+import type { IncidentTypeSummaryDto } from './response/trip-incidents.response';
 
 export type TripIncidentFilter = { eventType?: IncidentType; severity?: IncidentSeverity };
 export type TripIncidentOptions = { sort?: Record<string, SortOrder>; limit?: number };
@@ -23,6 +24,17 @@ export class IncidentsRepository extends BaseRepository<Incident> {
     return this.incidentModel
       .find({ driver: driverId, occurredAt: { $gte: since } })
       .sort({ pointsDeducted: -1 })
+      .limit(limit)
+      .lean()
+      .exec();
+  }
+
+  // A driver's incidents since a date, `sort`ed (newest first by default), at most `limit` of them
+  findByDriver(driverId: Types.ObjectId, since: Date, { sort = { occurredAt: -1 }, limit = 0 }: TripIncidentOptions = {}) {
+    return this.incidentModel
+      .find({ driver: driverId, occurredAt: { $gte: since } })
+      .select('trip type severity occurredAt pointsDeducted')
+      .sort(sort)
       .limit(limit)
       .lean()
       .exec();
@@ -89,5 +101,37 @@ export class IncidentsRepository extends BaseRepository<Incident> {
       { $group: { _id: '$type', count: { $sum: 1 } } },
     ])
     .exec();
+  }
+
+  /** Count and points lost per incident type for a driver, since `since` if given. Types without incidents are left out. */
+  summarizeByType(driverId: Types.ObjectId, since?: Date) {
+    // aggregate() doesn't cast like find(), so the id must already be an ObjectId
+    const match: QueryFilter<Incident> = { driver: driverId };
+    if (since) match.occurredAt = { $gte: since };
+
+    return this.incidentModel
+      .aggregate<IncidentTypeSummaryDto>([
+        { $match: match },
+        { $group: { _id: '$type', count: { $sum: 1 }, totalDeduction: { $sum: '$pointsDeducted' } } },
+        { $project: { _id: 0, type: '$_id', count: 1, totalDeduction: { $round: ['$totalDeduction', 1] } } },
+      ])
+      .exec();
+  }
+
+  /** How many incidents the trip has, and the points they cost in total. */
+  async tripTotals(tripId: Types.ObjectId): Promise<{ count: number; pointsDeducted: number }> {
+    const [totals] = await this.incidentModel
+      .aggregate<{ count: number; pointsDeducted: number }>([
+        { $match: { trip: tripId } },
+        { $group: { _id: null, count: { $sum: 1 }, pointsDeducted: { $sum: '$pointsDeducted' } } },
+      ])
+      .exec();
+    return totals ?? { count: 0, pointsDeducted: 0 };
+  }
+
+  /** @returns How many incidents were stored. */
+  async insertMany(incidents: Partial<Incident>[]): Promise<number> {
+    const inserted = await this.incidentModel.insertMany(incidents);
+    return inserted.length;
   }
 }

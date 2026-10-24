@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { IncidentsModule } from '@modules/incidents/incidents.module';
+import { TripIngestionService } from './trip-ingestion.service';
 import { TripMapController } from './trip-map.controller';
 import { TripMapService } from './trip-map.service';
 import { TripRoutePoint, TripRoutePointSchema } from './trip-route-point.model';
@@ -19,7 +20,7 @@ import { TripsService } from './trips.service';
     IncidentsModule,
   ],
   controllers: [TripsController, TripMapController],
-  providers: [TripsService, TripsRepository, TripMapService, TripRouteRepository],
+  providers: [TripsService, TripsRepository, TripMapService, TripRouteRepository, TripIngestionService],
   exports: [TripsService],
 })
 export class TripsModule {}

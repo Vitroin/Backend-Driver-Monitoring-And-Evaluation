@@ -1,6 +1,5 @@
-import { BaseResponseSchema, CurrentUser } from '@common';
+import { BaseResponseSchema } from '@common';
 import type { DataResponseDto } from '@common';
-import type { UserDocument } from '@modules/users/user.model';
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ParseObjectIdPipe } from '@nestjs/mongoose';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
@@ -23,7 +22,7 @@ import {
   type TripRouteQueryDto,
 } from './trip_map.dto';
 
-// The trip page's map. Login required: a driver sees their own trips, organization staff their organization's trips.
+// The trip page's map. Login required.
 @ApiBearerAuth()
 @Controller('trips')
 export class TripMapController {
@@ -34,14 +33,13 @@ export class TripMapController {
   @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(tripMapSchema) })
   @ApiResponse({ status: 400, description: 'Invalid trip id or query' })
   @ApiResponse({ status: 401, description: 'Not logged in' })
-  @ApiResponse({ status: 404, description: 'Trip not found, or not visible to the logged-in user' })
+  @ApiResponse({ status: 404, description: 'Trip not found' })
   @Get(':tripId/map')
-  getMap(
-    @CurrentUser() user: UserDocument,
+  async getMap(
     @Param('tripId', ParseObjectIdPipe) tripId: Types.ObjectId,
     @Query({ schema: tripMapQuerySchema }) query: TripMapQueryDto,
   ): Promise<DataResponseDto<TripMapDto>> {
-    return this.tripMapService.getMap(user, tripId, query);
+    return { message: 'Trip map data', data: await this.tripMapService.getMap(tripId, query) };
   }
 
   @ApiParam({ name: 'tripId', type: String, example: '6ad24e609609bf3649c97cdf' })
@@ -49,28 +47,26 @@ export class TripMapController {
   @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(tripRouteSchema) })
   @ApiResponse({ status: 400, description: 'Invalid trip id or query' })
   @ApiResponse({ status: 401, description: 'Not logged in' })
-  @ApiResponse({ status: 404, description: 'Trip not found, or not visible to the logged-in user' })
+  @ApiResponse({ status: 404, description: 'Trip not found' })
   @Get(':tripId/route')
-  getRoute(
-    @CurrentUser() user: UserDocument,
+  async getRoute(
     @Param('tripId', ParseObjectIdPipe) tripId: Types.ObjectId,
     @Query({ schema: tripRouteQuerySchema }) query: TripRouteQueryDto,
   ): Promise<DataResponseDto<TripRouteDto>> {
-    return this.tripMapService.getRoute(user, tripId, query);
+    return { message: 'Trip route', data: await this.tripMapService.getRoute(tripId, query) };
   }
 
   @ApiParam({ name: 'tripId', type: String, example: '6ad24e609609bf3649c97cdf' })
-  @ApiOperation({ summary: "A trip's incidents in chronological order, with their map location when one was recorded" })
+  @ApiOperation({ summary: "A trip's incidents with their map location when one was recorded", description: 'Chronological by default; `?sort=-pointsDeducted&limit=5` gives the costliest five.' })
   @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(incidentMarkerSchema.array()) })
   @ApiResponse({ status: 400, description: 'Invalid trip id or query' })
   @ApiResponse({ status: 401, description: 'Not logged in' })
-  @ApiResponse({ status: 404, description: 'Trip not found, or not visible to the logged-in user' })
+  @ApiResponse({ status: 404, description: 'Trip not found' })
   @Get(':tripId/incidents')
-  getIncidents(
-    @CurrentUser() user: UserDocument,
+  async getIncidents(
     @Param('tripId', ParseObjectIdPipe) tripId: Types.ObjectId,
     @Query({ schema: tripIncidentsQuerySchema }) query: TripIncidentsQueryDto,
   ): Promise<DataResponseDto<IncidentMarkerDto[]>> {
-    return this.tripMapService.getIncidents(user, tripId, query);
+    return { message: 'Trip incidents', data: await this.tripMapService.getIncidents(tripId, query) };
   }
 }

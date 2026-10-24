@@ -29,6 +29,11 @@ export type TripRouteQueryDto = z.infer<typeof tripRouteQuerySchema>;
 export const tripIncidentsQuerySchema = z.strictObject({
   eventType: z.enum(IncidentType).optional(),
   severity: z.enum(IncidentSeverity).optional(),
+  sort: z
+    .enum(['occurredAt', '-pointsDeducted'])
+    .default('occurredAt')
+    .meta({ description: '`occurredAt`: chronological; `-pointsDeducted`: the costliest first' }),
+  limit: z.coerce.number().int().min(1).max(500).optional().meta({ description: 'At most this many; all of them when left out' }),
 });
 export type TripIncidentsQueryDto = z.infer<typeof tripIncidentsQuerySchema>;
 

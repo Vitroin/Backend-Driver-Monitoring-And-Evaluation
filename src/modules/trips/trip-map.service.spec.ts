@@ -34,7 +34,7 @@ describe('TripMapService', () => {
   const driverId = new Types.ObjectId();
   const organizationId = new Types.ObjectId();
   const tripId = new Types.ObjectId();
-  const driver = { _id: driverId, role: UserRole.DRIVER, organization: [organizationId] };
+  const driver = { _id: driverId, role: UserRole.DRIVER, organization: organizationId };
 
   const trip = {
     _id: tripId,
@@ -78,7 +78,7 @@ describe('TripMapService', () => {
     it("404s for another driver's trip without reading its route or incidents", async () => {
       const otherDriver = { ...driver, _id: new Types.ObjectId() };
       await expect(service.getRoute(otherDriver, tripId, { maxPoints: 100 })).rejects.toThrow(NotFoundException);
-      await expect(service.getIncidents(otherDriver, tripId, {})).rejects.toThrow(NotFoundException);
+      await expect(service.getIncidents(otherDriver, tripId, { sort: 'occurredAt' })).rejects.toThrow(NotFoundException);
       expect(tripRouteRepository.streamPoints).not.toHaveBeenCalled();
       expect(incidentsService.findByTrip).not.toHaveBeenCalled();
     });
@@ -89,7 +89,7 @@ describe('TripMapService', () => {
       const second = point(2, 36);
       withRoute([point(0, 30), second, point(4, 39), point(6, 45, 50), point(8, null)]);
 
-      const { data } = await service.getRoute(driver, tripId, { maxPoints: 100 });
+      const data = await service.getRoute(driver, tripId, { maxPoints: 100 });
 
       expect(data.points.map((p) => [p.speedCategory, p.speedLimitKmh, p.speedLimitSource])).toEqual([
         [SpeedCategory.WITHIN_LIMIT, 35, SpeedLimitSource.TRIP],
@@ -122,7 +122,7 @@ describe('TripMapService', () => {
       tripsRepository.findMapTrip.mockResolvedValue({ ...trip, speedLimitKmh: null });
       withRoute([point(0, 30), point(2, 90)]);
 
-      const { data } = await service.getRoute(driver, tripId, { maxPoints: 100 });
+      const data = await service.getRoute(driver, tripId, { maxPoints: 100 });
 
       expect(data.points.map((p) => [p.speedCategory, p.speedLimitSource])).toEqual([
         [SpeedCategory.UNKNOWN, null],
@@ -131,14 +131,14 @@ describe('TripMapService', () => {
     });
 
     it('returns an empty route when no GPS was recorded', async () => {
-      const { data } = await service.getRoute(driver, tripId, { maxPoints: 100 });
+      const data = await service.getRoute(driver, tripId, { maxPoints: 100 });
       expect(data).toEqual({ points: [], segments: [], totalPoints: 0, downsampled: false });
     });
 
     it('downsamples a long route to about maxPoints', async () => {
       withRoute(Array.from({ length: 10 }, (_, i) => point(i, 30)));
 
-      const { data } = await service.getRoute(driver, tripId, { maxPoints: 5 });
+      const data = await service.getRoute(driver, tripId, { maxPoints: 5 });
 
       expect(data.points.map((p) => p.offsetSeconds)).toEqual([0, 2, 4, 6, 8, 9]);
       expect(data).toMatchObject({ totalPoints: 10, downsampled: true });
@@ -169,9 +169,13 @@ describe('TripMapService', () => {
     it("returns markers with the trip's limit and the time into the trip", async () => {
       incidentsService.findByTrip.mockResolvedValue([incident]);
 
-      const { data } = await service.getIncidents(driver, tripId, { eventType: IncidentType.HARSH_BRAKING });
+      const data = await service.getIncidents(driver, tripId, { eventType: IncidentType.HARSH_BRAKING, sort: 'occurredAt' });
 
-      expect(incidentsService.findByTrip).toHaveBeenCalledWith(tripId, { eventType: IncidentType.HARSH_BRAKING });
+      expect(incidentsService.findByTrip).toHaveBeenCalledWith(
+        tripId,
+        { eventType: IncidentType.HARSH_BRAKING, severity: undefined },
+        { sort: { occurredAt: 1 }, limit: undefined },
+      );
       expect(data).toEqual([
         {
           id: incidentId.toString(),
@@ -189,12 +193,21 @@ describe('TripMapService', () => {
       ]);
     });
 
+    it('asks for the costliest incidents first when sorted by -pointsDeducted', async () => {
+      await service.getIncidents(driver, tripId, { sort: '-pointsDeducted', limit: 5 });
+      expect(incidentsService.findByTrip).toHaveBeenCalledWith(
+        tripId,
+        { eventType: undefined, severity: undefined },
+        { sort: { pointsDeducted: -1, occurredAt: 1 }, limit: 5 },
+      );
+    });
+
     it('leaves the location null rather than guessing one', async () => {
       // An incident saved before location/speedKmh existed: lean() returns the fields as undefined
       const { location: _location, speedKmh: _speedKmh, ...legacy } = incident;
       incidentsService.findByTrip.mockResolvedValue([legacy]);
 
-      const { data } = await service.getIncidents(driver, tripId, {});
+      const data = await service.getIncidents(driver, tripId, { sort: 'occurredAt' });
 
       expect(data[0]).toMatchObject({ location: null, speedKmh: null });
     });
@@ -219,10 +232,9 @@ describe('TripMapService', () => {
         incident(IncidentType.PHONE_USAGE, 90, null),
       ]);
 
-      const { message, data } = await service.getMap(driver, tripId, { maxPoints: 100 });
+      const data = await service.getMap(driver, tripId, { maxPoints: 100 });
 
-      expect(message).toBe('Trip map data');
-      expect(incidentsService.findByTrip).toHaveBeenCalledWith(tripId, undefined);
+      expect(incidentsService.findByTrip).toHaveBeenCalledWith(tripId, undefined, undefined);
       expect(data.trip).toEqual({
         id: tripId.toString(),
         code: 'T-24013',
@@ -254,7 +266,7 @@ describe('TripMapService', () => {
     it('says so when there is no route or end time yet', async () => {
       tripsRepository.findMapTrip.mockResolvedValue({ ...trip, status: TripStatus.PROCESSING, durationSeconds: null, distanceKm: null });
 
-      const { data } = await service.getMap(driver, tripId, { maxPoints: 100 });
+      const data = await service.getMap(driver, tripId, { maxPoints: 100 });
 
       expect(data.trip).toMatchObject({ endedAt: null, durationSeconds: null, distanceKm: null });
       expect(data.metadata).toMatchObject({ hasRoute: false, hasIncidents: false, incidentsWithoutLocation: 0 });

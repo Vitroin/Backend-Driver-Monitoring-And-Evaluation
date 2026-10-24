@@ -1,4 +1,6 @@
-import { Model, QueryFilter, UpdateQuery, ProjectionType, QueryOptions, HydratedDocument } from 'mongoose';
+import { Model, QueryFilter, UpdateQuery, ProjectionType, QueryOptions, HydratedDocument, SortOrder } from 'mongoose';
+import type { Page } from '../interfaces/base.response';
+import { skipFor, type PaginationQuery } from '../types/pagination';
 
 export abstract class BaseRepository<T> {
   protected constructor(protected readonly model: Model<T>) {}
@@ -17,6 +19,19 @@ export abstract class BaseRepository<T> {
 
   async find(filter: QueryFilter<T> = {}, projection?: ProjectionType<T>, options?: QueryOptions<T>): Promise<HydratedDocument<T>[]> {
     return this.model.find(filter, projection, options).exec();
+  }
+
+  /** One page of the documents matching `filter`, newest first unless `sort` says otherwise, with the total count. */
+  async findPage(
+    filter: QueryFilter<T>,
+    pagination: PaginationQuery,
+    { projection, sort = { _id: -1 } }: { projection?: ProjectionType<T>; sort?: Record<string, SortOrder> } = {},
+  ): Promise<Page<HydratedDocument<T>>> {
+    const [items, total] = await Promise.all([
+      this.model.find(filter, projection).sort(sort).skip(skipFor(pagination)).limit(pagination.limit).exec(),
+      this.model.countDocuments(filter).exec(),
+    ]);
+    return { items, total };
   }
 
   async updateById(id: string, update: UpdateQuery<T>): Promise<HydratedDocument<T> | null> {

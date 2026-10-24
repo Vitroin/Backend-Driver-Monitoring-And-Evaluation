@@ -12,6 +12,9 @@ export function riskForScore(score: number): TripRisk {
 
 export const roundToOneDecimal = (value: number): number => Math.round(value * 10) / 10;
 
+// A trip starts at 100 and loses each counted incident's points, never going below 0
+export const scoreForDeductions = (pointsDeducted: number): number => Math.max(0, roundToOneDecimal(100 - pointsDeducted));
+
 export const average = (values: number[]): number => values.reduce((sum, value) => sum + value, 0) / values.length;
 
 // Long-term score (SRS §8.4): mean of trip scores weighted by duration × exp(−age / 30 days),

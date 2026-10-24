@@ -6,6 +6,7 @@ import { Types } from 'mongoose';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IncidentType, TripStatus, UserRole, UserStatus } from '@common/enums';
+import { Authenticator } from '@modules/auth/authenticator.service';
 import { AuthenticationGuard } from '@modules/auth/guards/authentication.guard';
 import { TokenService } from '@modules/auth/token/token.service';
 import { IncidentsService } from '@modules/incidents/incidents.service';
@@ -74,6 +75,7 @@ describe('TripMapController (HTTP)', () => {
       controllers: [TripMapController],
       providers: [
         TripMapService,
+        Authenticator,
         { provide: TripsRepository, useValue: tripsRepository },
         { provide: TripRouteRepository, useValue: tripRouteRepository },
         { provide: IncidentsService, useValue: incidentsService },
@@ -150,12 +152,17 @@ describe('TripMapController (HTTP)', () => {
     ['too few points', 'map?maxPoints=1'],
     ['an unknown incident type', 'incidents?eventType=crash'],
     ['an unknown query parameter', 'incidents?driver=me'],
+    ['an unknown sort', 'incidents?sort=type'],
   ])('rejects %s', async (_, path) => {
     await get(`/trips/${tripId}/${path}`, 'driver').expect(400);
   });
 
   it('passes the incident filters through', async () => {
     await get(`/trips/${tripId}/incidents?eventType=harsh_braking&severity=high`, 'driver').expect(200);
-    expect(incidentsService.findByTrip).toHaveBeenLastCalledWith(tripId, { eventType: IncidentType.HARSH_BRAKING, severity: 'high' });
+    expect(incidentsService.findByTrip).toHaveBeenLastCalledWith(
+      tripId,
+      { eventType: IncidentType.HARSH_BRAKING, severity: 'high' },
+      { sort: { occurredAt: 1 }, limit: undefined },
+    );
   });
 });

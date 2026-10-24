@@ -1,8 +1,9 @@
 import { OrganizationTypes } from '@modules/organizations/organizations.enum';
 import { User } from '@modules/users/user.model';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { SchemaTypes, Types } from 'mongoose';
+import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 
+export type OrganizationDocument = HydratedDocument<Organization>;
 
 @Schema({ timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } })
 export class Organization {

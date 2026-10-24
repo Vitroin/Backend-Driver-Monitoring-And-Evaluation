@@ -8,6 +8,9 @@ import { riskForScore } from './trip-scoring';
 
 export type TripDocument = HydratedDocument<Trip>;
 
+/** Statuses in which the in-vehicle unit may still upload data and complete the trip. */
+export const OPEN_TRIP_STATUSES = [TripStatus.PLANNED, TripStatus.RECORDING, TripStatus.UPLOADING];
+
 @Schema()
 export class TripSpeeds {
   time: string;
@@ -121,12 +124,10 @@ TripSchema.index({ driver: 1, startedAt: -1 });
 // All trips in an organization, newest first (analysts / instructors)
 TripSchema.index({ organization: 1, startedAt: -1 });
 
+// Filled only by queries that populate it: mongoose-autopopulate is no longer a dependency
 TripSchema.virtual('incidents', {
   ref: Incident.name,
   localField: '_id',
   foreignField: 'trip',
   options: { sort: { occurredAt: 1 } },
-  autopopulate: true,
 });
-
-TripSchema.plugin(require('mongoose-autopopulate'));

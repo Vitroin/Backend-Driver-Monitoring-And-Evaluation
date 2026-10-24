@@ -1,8 +1,10 @@
 import type { DataResponseDto } from '@common';
 import { Injectable } from '@nestjs/common';
 import { Types } from 'mongoose';
-import { IncidentsRepository, type TripIncidentFilter, type TripIncidentRow } from './incidents.repository';
-import type { SignificantEventDto } from './response/significant-event.response';
+import { IncidentsRepository, type TripIncidentFilter, type TripIncidentOptions, type TripIncidentRow } from './incidents.repository';
+import type { Incident } from './incidents.model';
+import type { DriverIncidentDto } from './response/significant-event.response';
+import type { IncidentTypeSummaryDto } from './response/trip-incidents.response';
 import { CacheService } from '@infrastructure/cache';
 import { IncidentType } from '@common/enums';
 
@@ -22,13 +24,14 @@ export class IncidentsService {
   ) {}
 
   // Used in the Main Dashboard: the 5 incidents that cost the most points in the last 60 days
-  async getIncidents(driverId: string): Promise<DataResponseDto<SignificantEventDto[]>> {
+  async getIncidents(driverId: string): Promise<DataResponseDto<DriverIncidentDto[]>> {
     const since = new Date(Date.now() - SIGNIFICANT_EVENTS_DAYS * DAY_MS);
     const incidents = await this.incidentsRepository.findMostSignificant(driverId, since, SIGNIFICANT_EVENTS_LIMIT);
     return {
       message: 'Most significant events',
-      data: incidents.map(({ _id, type, severity, occurredAt, pointsDeducted }) => ({
+      data: incidents.map(({ _id, trip, type, severity, occurredAt, pointsDeducted }) => ({
         id: _id.toString(),
+        tripId: trip.toString(),
         type,
         severity,
         occurredAt: occurredAt.toISOString(),
@@ -70,10 +73,27 @@ export class IncidentsService {
 
   // ---------- used by other modules ----------
 
-  // One trip's incidents, oldest first (the trip map's markers and timeline)
-  findByTrip(tripId: Types.ObjectId, filter?: TripIncidentFilter): Promise<TripIncidentRow[]> {
-    return this.incidentsRepository.findByTrip(tripId, filter);
+  // One trip's incidents, oldest first unless `options.sort` says otherwise (the trip map's markers and timeline)
+  findByTrip(tripId: Types.ObjectId, filter?: TripIncidentFilter, options?: TripIncidentOptions): Promise<TripIncidentRow[]> {
+    return this.incidentsRepository.findByTrip(tripId, filter, options);
   }
+
+  /** A driver's incidents in the last `days` days. */
+  findByDriver(driverId: Types.ObjectId, days: number, options?: TripIncidentOptions) {
+    return this.incidentsRepository.findByDriver(driverId, new Date(Date.now() - days * DAY_MS), options);
+  }
+
+  /** A driver's count and points lost for every incident type (0 for types that didn't happen), in IncidentType order. */
+  async summarizeByType(driverId: Types.ObjectId, since?: Date): Promise<IncidentTypeSummaryDto[]> {
+    const rows = await this.incidentsRepository.summarizeByType(driverId, since);
+    const byType = new Map(rows.map((row) => [row.type, row]));
+    return Object.values(IncidentType).map((type) => byType.get(type) ?? { type, count: 0, totalDeduction: 0 });
+  }
+
+  tripTotals(tripId: Types.ObjectId): Promise<{ count: number; pointsDeducted: number }> {
+    return this.incidentsRepository.tripTotals(tripId);
+  }
+
 
   async getRecentTypeCounts() {
     const cached = await this.cacheService.get<{ _id: IncidentType; count: number }[]>(TYPE_COUNTS_KEY);

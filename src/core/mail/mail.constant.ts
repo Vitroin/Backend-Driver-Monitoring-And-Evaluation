@@ -3,6 +3,9 @@ import type { JobsOptions } from 'bullmq';
 export const MAIL_QUEUE = 'mail';
 export const SEND_MAIL_JOB = 'send-mail';
 
+/** Injection token of the nodemailer transporter the mail worker sends with. */
+export const MAIL_TRANSPORT = Symbol('MAIL_TRANSPORT');
+
 export const MAIL_JOB_OPTIONS: JobsOptions = {
   attempts: 3,                                   // retry up to 3 times if sending fails
   backoff: { type: 'exponential', delay: 5000 }, // wait 5s, then 10s, then 20s

@@ -15,8 +15,8 @@ import type {
 } from './response';
 import { average, longTermScore, riskForScore, roundToOneDecimal } from './trip-scoring';
 import { TripDocument } from './trips.model';
-import { TripsRepository } from './trips.repository';
-import { ScoreOverviewDto } from './response/score-overview.response';
+import { TripsRepository, type TripTotals } from './trips.repository';
+import { ScoreOverviewDto, type ScorePointDto } from './response/score-overview.response';
 import { TripsFilterDto } from './trips_filter.dto';
 
 // "Last trip score" compares the last trip with the average of the 5 before it
@@ -236,5 +236,44 @@ export class TripsService {
       message: 'Progress graph data',
       data: graphData,
     };
+  }
+
+  //--------------------------------------------------------
+  // ---------- used by the drivers module: plain data, the controller adds the message ----------
+
+  /** Totals over the driver's completed, scored trips; zeros when they have none. */
+  completedTotals(driverId: Types.ObjectId): Promise<TripTotals> {
+    return this.tripsRepository.getTotals(driverId);
+  }
+
+  /** The score of the driver's latest scored trip; null before the first one. */
+  async latestScore(driverId: Types.ObjectId): Promise<number | null> {
+    const [lastTrip] = await this.tripsRepository.findRecentTrip(driverId, 1);
+    return lastTrip?.score ?? null;
+  }
+
+  /** Average score of the driver's `count` newest or oldest scored trips; null before the first one. */
+  async averageScore(driverId: Types.ObjectId, order: 'newest' | 'oldest', count: number): Promise<number | null> {
+    const [result] =
+      order === 'newest'
+        ? await this.tripsRepository.averageRecentTripScore(driverId, count)
+        : await this.tripsRepository.averageLastTripScore(driverId, count);
+    return result ? roundToOneDecimal(result.averageScore) : null;
+  }
+
+  async bestScore(driverId: Types.ObjectId): Promise<number | null> {
+    const [result] = await this.tripsRepository.bestTripScore(driverId);
+    return result?.bestScore ?? null;
+  }
+
+  /** Long-term score (SRS §8.4): trip scores weighted by duration and recency. null before the first scored trip. */
+  async longTermScore(driverId: Types.ObjectId): Promise<number | null> {
+    return longTermScore(await this.tripsRepository.findScoredTrips(driverId));
+  }
+
+  /** One point per scored trip, oldest first. */
+  async scoreHistory(driverId: Types.ObjectId): Promise<ScorePointDto[]> {
+    const trips = await this.tripsRepository.scoreHistory(driverId);
+    return trips.map(({ _id, code, startedAt, score }) => ({ tripId: _id.toString(), code, startedAt: startedAt.toISOString(), score }));
   }
 }

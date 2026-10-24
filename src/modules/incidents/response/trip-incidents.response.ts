@@ -23,3 +23,11 @@ export const tripIncidentsSchema = z.object({
   incidents: z.array(tripIncidentSchema).meta({ description: 'Most points deducted first' }),
 });
 export type TripIncidentsDto = z.infer<typeof tripIncidentsSchema>;
+
+// Count and points lost for one incident type; every type is listed, with 0 for the ones that didn't happen
+export const incidentTypeSummarySchema = z.object({
+  type: z.enum(IncidentType),
+  count: z.number().int().meta({ example: 3 }),
+  totalDeduction: z.number().meta({ description: 'Points lost to this type, positive', example: 12.4 }),
+});
+export type IncidentTypeSummaryDto = z.infer<typeof incidentTypeSummarySchema>;

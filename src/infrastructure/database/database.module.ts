@@ -14,7 +14,8 @@ import mongoose from 'mongoose';
 
         return {
           uri: configService.getOrThrow<string>(ConfigNames.DB_URL),
-          autoIndex: true, // Automatically build indexes defined in your schemas on startup. Set to false in production for performance reasons.
+          // Builds the indexes the schemas declare (unique usernames, trip codes, ...) on startup, in every environment
+          autoIndex: true,
         };
       },
     }),

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Types } from 'mongoose';
 import { UsersService } from '@modules/users/users.service';
 import { InstructorsRepository } from './instructors.repository';
 
@@ -10,7 +11,7 @@ export class InstructorsService {
   ) {}
 
   /** Adds a driver to an instructor's students. Both must be in the given organization. */
-  async assignStudent(organizationId: string, instructorId: string, driverId: string) {
+  async assignStudent(organizationId: string, instructorId: string, driverId: string): Promise<void> {
     const driver = await this.usersService.findDriverInOrganization(driverId, organizationId);
     if (!driver) throw new NotFoundException('Driver not found in this organization');
 
@@ -21,7 +22,11 @@ export class InstructorsService {
       { $addToSet: { drivingStudents: driver._id } },
     );
     if (!instructor) throw new NotFoundException('Instructor not found in this organization');
+  }
 
-    return { success: true, message: 'Driver assigned to instructor successfully' };
+  /** The ids of the instructors who teach the driver (who to notify about the driver's trips). */
+  async findInstructorIdsOf(driverId: string | Types.ObjectId): Promise<Types.ObjectId[]> {
+    const instructors = await this.instructorsRepository.find({ drivingStudents: driverId }, { _id: 1 });
+    return instructors.map((instructor) => instructor._id);
   }
 }

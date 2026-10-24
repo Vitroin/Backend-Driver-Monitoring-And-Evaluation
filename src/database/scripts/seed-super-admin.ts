@@ -22,6 +22,7 @@ async function seedSuperAdmin() {
       age: 30,
       gender: 'male',
       status: 'active',
+      organization: null,
       role: 'super_admin',
       mustChangePassword: false,
       createdAt: new Date(),

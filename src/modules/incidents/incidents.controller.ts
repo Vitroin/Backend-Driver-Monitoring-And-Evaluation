@@ -6,7 +6,7 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse } from '@n
 import { ParseObjectIdPipe } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
 import { IncidentsService } from './incidents.service';
-import { SignificantEventDto, significantEventSchema } from './response/significant-event.response';
+import { DriverIncidentDto, driverIncidentSchema } from './response/significant-event.response';
 import { tripIncidentsSchema } from './response/trip-incidents.response';
 
 @ApiBearerAuth()
@@ -17,10 +17,10 @@ export class IncidentsController {
 
   @AllowedRoles([UserRole.DRIVER])
   @ApiOperation({ summary: "The logged-in driver's 5 incidents that cost the most points in the last 60 days" })
-  @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(significantEventSchema.array()) })
+  @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(driverIncidentSchema.array()) })
   @Get('/significant')
   /*Main Dashboard: This function is used to get incidents that  cost the most points within the range of 60 days, this endpoint is used in the MainPage*/
-  getMyMostSignificant(@CurrentUser('id') driverId: string): Promise<DataResponseDto<SignificantEventDto[]>> {
+  getMyMostSignificant(@CurrentUser('id') driverId: string): Promise<DataResponseDto<DriverIncidentDto[]>> {
     return this.incidentsService.getIncidents(driverId);
   }
 

@@ -18,6 +18,13 @@ export const OTP_LENGTH = 6;
 export const OTP_MAX_ATTEMPTS = 5;
 export const OTP_RESEND_COOLDOWN_SECONDS = 60;
 
+/** Thrown by `issue` when the previous OTP for the same purpose and user is less than a minute old. */
+export class OtpCooldownException extends HttpException {
+  constructor() {
+    super(`Please wait ${OTP_RESEND_COOLDOWN_SECONDS} seconds before requesting another code`, HttpStatus.TOO_MANY_REQUESTS);
+  }
+}
+
 @Injectable()
 export class OtpService {
   constructor(
@@ -33,18 +40,23 @@ export class OtpService {
   }
 
   /**
-   * Generates an OTP and stores its HMAC under `key`, replacing any previous OTP for that key.
+   * Generates an OTP and stores its HMAC, replacing any previous OTP for the same purpose and user.
    * @param {OtpPurpose} purpose  The purpose of the OTP.
    * @param {string} userId The ID of the user for whom the OTP is being generated.
-   * @throws HttpException 429 when an OTP was issued for the same key less than a minute ago.
+   * @throws OtpCooldownException (429) when an OTP was issued for the same purpose and user less than a minute ago,
+   *   so the endpoint can't be used to flood someone's inbox.
    * @returns The plain OTP, to be sent to the user.
    */
   async issue(purpose: OtpPurpose, userId: string): Promise<string> {
     const key = this.cacheKey(purpose, userId);
+    const cooldownKey = `${key}:cooldown`;
+    if (await this.cacheService.get<boolean>(cooldownKey)) throw new OtpCooldownException();
+
     const otp = this.generate();
     const ttl = this.config.getOrThrow<number>(ConfigNames.OTP_EXPIRY_MINUTES) * 60;
     const record: OtpRecord = { hash: this.hmac(otp), attempts: 0, expiresAt: Date.now() + ttl * 1000 };
     await this.cacheService.set({ key, value: record, ttl });
+    await this.cacheService.set({ key: cooldownKey, value: true, ttl: OTP_RESEND_COOLDOWN_SECONDS });
     return otp;
   }
 

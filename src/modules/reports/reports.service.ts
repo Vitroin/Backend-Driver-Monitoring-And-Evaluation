@@ -197,7 +197,7 @@ export class ReportsService {
       this.tripsService.getTotals(driverId),
       this.incidentsService.getAllIncidentsForTrip(driverId),
       this.tripsService.filterTrips(driverId, { status: TripStatus.COMPLETED, page: 1, limit: RECENT_TRIPS_COUNT }),
-      this.getRecommendations(),
+      this.getRecommendations(driverId),
     ]);
 
     return {
@@ -226,13 +226,13 @@ export class ReportsService {
   }
 
   /**
-   * Expects FastAPI to answer `{ recommendations: string[] }`. Its /coach/recommendations is still a placeholder that
-   * returns `{ success, message }` and doesn't take a driver, so for now this is empty and the PDF shows "No recommendations available."
-   * A FastAPI failure leaves them out instead of failing the whole report.
+   * Expects FastAPI to answer `{ recommendations: string[] }` for the driver (sent as `?driverId=`). Its
+   * /coach/recommendations is still a placeholder that returns `{ success, message }`, so for now this is empty and the
+   * PDF shows "No recommendations available." A FastAPI failure leaves them out instead of failing the whole report.
    */
-  private async getRecommendations(): Promise<string[]> {
+  private async getRecommendations(driverId: string): Promise<string[]> {
     try {
-      const response = await this.fastApiService.getrecommendations();
+      const response = (await this.fastApiService.getRecommendations(driverId)) as { recommendations?: unknown } | null;
       const recommendations: unknown = response?.recommendations;
       return Array.isArray(recommendations)
         ? recommendations.filter((item): item is string => typeof item === 'string')

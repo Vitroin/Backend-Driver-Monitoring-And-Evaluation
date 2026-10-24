@@ -8,6 +8,7 @@ export const scorePointSchema = z.object({
   score: z.number().meta({ example: 90.4 }),
   startedAt: z.iso.datetime().meta({ example: '2026-10-08T09:18:00.000Z' }),
 });
+export type ScorePointDto = z.infer<typeof scorePointSchema>;
 
 export const scoreOverviewSchema = z.object({
   longTermScore: z

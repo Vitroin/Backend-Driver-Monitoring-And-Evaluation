@@ -1,10 +1,9 @@
 import { Module } from '@nestjs/common';
 import { FastApiService } from './fast-api.service';
-import { FastApiController } from './fast-api.controller';
+import { CoachingController } from './fast-api.controller';
 
 @Module({
-
-  controllers: [FastApiController],
+  controllers: [CoachingController],
   providers: [FastApiService],
   exports: [FastApiService],
 })

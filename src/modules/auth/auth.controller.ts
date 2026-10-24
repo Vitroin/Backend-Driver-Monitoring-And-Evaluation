@@ -1,36 +1,43 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { minutes, Throttle } from '@nestjs/throttler';
-import type { TokenPair } from './token';
 import { AuthService } from './auth.service';
 import {
   acceptInvitationSchema,
   changePasswordSchema,
   forcedPasswordChangeSchema,
   forgotPasswordSchema,
-  inviteUserSchema,
   loginSchema,
   refreshTokenSchema,
   resetPasswordSchema,
-  validateResetPasswordOtpSchema,
 } from './dtos';
-import { changePasswordDataSchema, LoginDataDto, loginDataSchema, UserResponseDto, userResponseSchema } from './response';
+import {
+  changePasswordDataSchema,
+  forcedPasswordChangeDataSchema,
+  loginDataSchema,
+  tokensDataSchema,
+  userResponseSchema,
+} from './response';
+import type {
+  ChangePasswordDataDto,
+  ForcedPasswordChangeDataDto,
+  LoginDataDto,
+  TokensDataDto,
+  UserResponseDto,
+} from './response';
 import type {
   AcceptInvitationDto,
   ChangePasswordDto,
   ForcedPasswordChangeDto,
   ForgotPasswordDto,
-  InviteUserDto,
   LoginDto,
   RefreshTokenDto,
   ResetPasswordDto,
-  ValidateResetPasswordOtpDto,
 } from './dtos';
 import { AllowedRoles, BaseResponseSchema, CurrentSession, CurrentUser, Public, idParamSchema } from '@common';
 import type { DataResponseDto, IdParam, MessageResponseDto, RequestSession } from '@common';
 import { UserRole } from '@common/enums';
 import type { UserDocument } from '@modules/users/user.model';
-
 
 const messageResponse = BaseResponseSchema();
 
@@ -41,20 +48,10 @@ const STRICT_THROTTLE = { default: { limit: 5, ttl: minutes(1) } };
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @ApiBearerAuth()
-  @AllowedRoles([UserRole.SUPER_ADMIN])
-  @ApiOperation({ summary: 'User invitation' })
-  @ApiResponse({ status: 201, description: 'User invited successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid input data' })
-  @Post('invite')
-  inviteUser(@Body({ schema: inviteUserSchema }) userData: InviteUserDto): Promise<MessageResponseDto> {
-    return this.authService.inviteUser(userData);
-  }
-
   @ApiOperation({
-    summary: 'Log in with email and password',
+    summary: 'Log in with username and password',
     description:
-      'When `passwordChangeRequired` is true, no tokens are issued: call POST /auth/forced-change-password with `passwordChangeToken`, then log in again.',
+      'When `passwordChangeRequired` is true, no tokens are issued: call POST /auth/forced-change-password with `passwordChangeToken`, which logs the user in.',
   })
   @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(loginDataSchema) })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
@@ -64,32 +61,38 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Throttle(STRICT_THROTTLE)
   @Post('login')
-  login(@Body({ schema: loginSchema }) loginDto: LoginDto): Promise<DataResponseDto<LoginDataDto>> {
-    return this.authService.login(loginDto);
+  async login(@Body({ schema: loginSchema }) loginDto: LoginDto): Promise<DataResponseDto<LoginDataDto>> {
+    const data = await this.authService.login(loginDto);
+    return { message: data.passwordChangeRequired ? 'Password change required' : 'Login successful', data };
   }
 
   @ApiOperation({
     summary: 'Exchange a refresh token for a new token pair',
-    description: 'The refresh token is single use. Reusing one revokes its whole session.',
+    description: 'The refresh token is single use: a token that was already exchanged is rejected with 401.',
   })
-  @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(changePasswordDataSchema) })
+  @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(tokensDataSchema) })
   @ApiResponse({ status: 401, description: 'Refresh token is invalid, expired or already used' })
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('refresh')
-  refresh(@Body({ schema: refreshTokenSchema }) refreshTokenDto: RefreshTokenDto): Promise<DataResponseDto<{ tokens: TokenPair }>> {
-    return this.authService.refresh(refreshTokenDto);
+  async refresh(@Body({ schema: refreshTokenSchema }) refreshTokenDto: RefreshTokenDto): Promise<DataResponseDto<TokensDataDto>> {
+    return { message: 'Tokens refreshed successfully', data: { tokens: await this.authService.refresh(refreshTokenDto) } };
   }
 
-  @ApiOperation({ summary: 'Set a new password after a login that returned passwordChangeRequired' })
-  @ApiResponse({ status: 200, standardSchema: messageResponse })
+  @ApiOperation({
+    summary: 'Set a new password after a login that returned passwordChangeRequired',
+    description: 'Logs the user in: returns a token pair and the user, like a successful login.',
+  })
+  @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(forcedPasswordChangeDataSchema) })
   @ApiResponse({ status: 401, description: 'Invalid or expired token' })
   @Public()
   @HttpCode(HttpStatus.OK)
   @Throttle(STRICT_THROTTLE)
   @Post('forced-change-password')
-  completeForcedPasswordChange(@Body({ schema: forcedPasswordChangeSchema }) dto: ForcedPasswordChangeDto): Promise<MessageResponseDto> {
-    return this.authService.completeForcedPasswordChange(dto);
+  async completeForcedPasswordChange(
+    @Body({ schema: forcedPasswordChangeSchema }) dto: ForcedPasswordChangeDto,
+  ): Promise<DataResponseDto<ForcedPasswordChangeDataDto>> {
+    return { message: 'Password changed successfully', data: await this.authService.completeForcedPasswordChange(dto) };
   }
 
   @ApiOperation({ summary: 'Activate an invited account by setting its password' })
@@ -100,54 +103,58 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Throttle(STRICT_THROTTLE)
   @Post('accept-invitation')
-  acceptInvitation(@Body({ schema: acceptInvitationSchema }) dto: AcceptInvitationDto): Promise<MessageResponseDto> {
-    return this.authService.acceptInvitation(dto);
+  async acceptInvitation(@Body({ schema: acceptInvitationSchema }) dto: AcceptInvitationDto): Promise<MessageResponseDto> {
+    await this.authService.acceptInvitation(dto);
+    return { message: 'Account activated successfully. You can now login with your new password.' };
   }
 
-  @ApiOperation({ summary: 'Email a password reset link', description: 'Always returns 200, whether or not the account exists.' })
+  @ApiOperation({
+    summary: 'Email a password reset code',
+    description: 'Always returns 200, whether or not the account exists. A new code can be requested once a minute.',
+  })
   @ApiResponse({ status: 200, standardSchema: messageResponse })
   @ApiResponse({ status: 429, description: 'Too many requests from this client' })
   @Public()
   @HttpCode(HttpStatus.OK)
   @Throttle(STRICT_THROTTLE)
   @Post('forgot-password')
-  forgotPassword(@Body({ schema: forgotPasswordSchema }) dto: ForgotPasswordDto): Promise<MessageResponseDto> {
-    return this.authService.forgotPassword(dto);
+  async forgotPassword(@Body({ schema: forgotPasswordSchema }) dto: ForgotPasswordDto): Promise<MessageResponseDto> {
+    await this.authService.forgotPassword(dto);
+    return { message: 'If an account exists for this username, a password reset code has been sent to its email.' };
   }
 
-  @ApiOperation({ summary: 'Set a new password using the token from a reset email', description: 'Ends every existing session of the user.' })
+  @ApiOperation({
+    summary: 'Set a new password using the emailed reset code',
+    description: 'The code works once. Ends every existing session of the user.',
+  })
   @ApiResponse({ status: 200, standardSchema: messageResponse })
-  @ApiResponse({ status: 401, description: 'Invalid or expired token' })
+  @ApiResponse({ status: 401, description: 'Invalid or expired code' })
   @Public()
   @HttpCode(HttpStatus.OK)
   @Throttle(STRICT_THROTTLE)
   @Post('reset-password')
-  resetPassword(@Body({ schema: resetPasswordSchema }) dto: ResetPasswordDto): Promise<MessageResponseDto> {
-    return this.authService.resetPassword(dto);
-  }
-
-  @ApiOperation({ summary: 'Validate a password reset OTP', description: 'Checks if the provided OTP is valid and not expired.' })
-  @ApiResponse({ status: 200, standardSchema: messageResponse })
-  @ApiResponse({ status: 401, description: 'Invalid or expired token' })
-  @Public()
-  @HttpCode(HttpStatus.OK)
-  @Throttle(STRICT_THROTTLE)
-  @Post('reset-password/validate')
-  validateResetPasswordOtp(@Body({ schema: validateResetPasswordOtpSchema }) dto: ValidateResetPasswordOtpDto): Promise<MessageResponseDto> {
-    return this.authService.validateResetPasswordOtp(dto);
+  async resetPassword(@Body({ schema: resetPasswordSchema }) dto: ResetPasswordDto): Promise<MessageResponseDto> {
+    await this.authService.resetPassword(dto);
+    return { message: 'Password reset successfully. You can now login with your new password.' };
   }
 
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Change the logged in user password',
-    description: 'Ends every other session and returns a new token pair. Super admins must also send `otp`.',
+    description:
+      'Ends every other session and returns a new token pair. Super admins call it twice: without `otp` (an OTP is emailed and `otpRequired` is true), then with it.',
   })
   @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(changePasswordDataSchema) })
-  @ApiResponse({ status: 403, description: 'Current password is incorrect, or OTP missing/invalid' })
+  @ApiResponse({ status: 403, description: 'Current password is incorrect, or OTP invalid' })
+  @ApiResponse({ status: 429, description: 'An OTP was already sent less than a minute ago' })
   @Throttle(STRICT_THROTTLE)
   @Patch('change-password')
-  changePassword(@Body({ schema: changePasswordSchema }) dto: ChangePasswordDto, @CurrentUser('id') userId: string) {
-    return this.authService.changePassword(dto, userId);
+  async changePassword(
+    @Body({ schema: changePasswordSchema }) dto: ChangePasswordDto,
+    @CurrentUser('id') userId: string,
+  ): Promise<DataResponseDto<ChangePasswordDataDto>> {
+    const data = await this.authService.changePassword(dto, userId);
+    return { message: data.otpRequired ? 'OTP sent to your registered email' : 'Password changed successfully', data };
   }
 
   @ApiBearerAuth()
@@ -165,8 +172,9 @@ export class AuthController {
   @ApiResponse({ status: 404, description: 'User not found' })
   @AllowedRoles([UserRole.SUPER_ADMIN])
   @Delete('users/:id/sessions')
-  revokeUserSessions(@Param({ schema: idParamSchema }) { id }: IdParam): Promise<MessageResponseDto> {
-    return this.authService.revokeUserSessions(id);
+  async revokeUserSessions(@Param({ schema: idParamSchema }) { id }: IdParam): Promise<MessageResponseDto> {
+    await this.authService.revokeUserSessions(id);
+    return { message: 'User logged out from all devices successfully' };
   }
 
   @ApiBearerAuth()
@@ -174,6 +182,6 @@ export class AuthController {
   @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(userResponseSchema) })
   @Get('me')
   getCurrentUser(@CurrentUser() user: UserDocument): DataResponseDto<UserResponseDto> {
-    return this.authService.getCurrentUser(user);
+    return { message: 'Current user information retrieved successfully', data: this.authService.getCurrentUser(user) };
   }
 }

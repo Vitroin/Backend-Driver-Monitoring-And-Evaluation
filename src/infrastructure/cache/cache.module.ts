@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { createKeyv } from '@keyv/redis';
+import { ConfigNames } from '@config';
 import { CacheService } from './cache.service';
 
 @Global()
@@ -11,8 +12,9 @@ import { CacheService } from './cache.service';
       isGlobal: true,
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const redis = configService.getOrThrow('redis');
-        return { stores: [createKeyv(`redis://${redis.host}:${redis.port}`)] };
+        const host = configService.getOrThrow<string>(ConfigNames.REDIS_HOST);
+        const port = configService.getOrThrow<number>(ConfigNames.REDIS_PORT);
+        return { stores: [createKeyv(`redis://${host}:${port}`)] };
       },
     }),
   ],

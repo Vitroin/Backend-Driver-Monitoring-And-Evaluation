@@ -9,8 +9,8 @@ import { ConfigNames } from '@config';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         connection: {
-          host: configService.getOrThrow(ConfigNames.REDIS_HOST),
-          port: Number(configService.getOrThrow(ConfigNames.REDIS_PORT)),
+          host: configService.getOrThrow<string>(ConfigNames.REDIS_HOST),
+          port: configService.getOrThrow<number>(ConfigNames.REDIS_PORT),
         },
       }),
     }),

@@ -1,6 +1,7 @@
-import {registerAs} from '@nestjs/config';
+import { registerAs } from '@nestjs/config';
 
 export default registerAs('fastapi', () => ({
-  url: process.env.FASTAPI_URL,
-  serviceToken: process.env.SERVICE_TOKEN,
-}))
+    url: process.env.FASTAPI_URL,
+    timeoutMs: process.env.FASTAPI_TIMEOUT_MS,
+    serviceToken: process.env.SERVICE_TOKEN,
+}));

@@ -39,5 +39,17 @@ export const loginDataSchema = z.discriminatedUnion('passwordChangeRequired', [
 ]);
 export type LoginDataDto = z.infer<typeof loginDataSchema>;
 
-export const changePasswordDataSchema = z.object({ tokens: tokensResponseSchema });
+export const tokensDataSchema = z.object({ tokens: tokensResponseSchema });
+export type TokensDataDto = z.infer<typeof tokensDataSchema>;
+
+// A forced password change logs the user in: same as a successful login
+export const forcedPasswordChangeDataSchema = z.object({ tokens: tokensResponseSchema, user: userResponseSchema });
+export type ForcedPasswordChangeDataDto = z.infer<typeof forcedPasswordChangeDataSchema>;
+
+// A super admin's first call (without `otp`) only sends the OTP; the second one changes the password
+export const changePasswordDataSchema = z.discriminatedUnion('otpRequired', [
+  z.object({ otpRequired: z.literal(true) }),
+  z.object({ otpRequired: z.literal(false), tokens: tokensResponseSchema }),
+]);
+export type ChangePasswordDataDto = z.infer<typeof changePasswordDataSchema>;
 

@@ -1,7 +1,10 @@
 import { NotificationsFactory } from './notifications.factory';
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import type { QueryFilter } from 'mongoose';
+import type { Page, PaginationQuery } from '@common';
 import { NotificationsRepository } from './notifications.repository';
 import { CreateNotificationDto } from './create-notification.dto';
+import type { Notification, NotificationDocument } from './notifications.model';
 
 @Injectable()
 export class NotificationsService {
@@ -51,5 +54,29 @@ export class NotificationsService {
       return { message: 'No unread notifications found for the user', data: null };
     }
     return { message: 'All notifications marked as read successfully', data: result };
+  }
+
+  // ---------- used by NotificationsController ----------
+
+  /** One page of the user's notifications, newest first; only the unread ones when `unread` is set. */
+  list(userId: string, unread: boolean, pagination: PaginationQuery): Promise<Page<NotificationDocument>> {
+    const filter: QueryFilter<Notification> = { recipient: userId };
+    if (unread) filter.readAt = null;
+    return this.notificationsRepository.findPage(filter, pagination, { sort: { createdAt: -1 } });
+  }
+
+  /** Marks one of the user's notifications read. One that is already read is returned as it is. */
+  async markAsRead(userId: string, notificationId: string): Promise<NotificationDocument> {
+    const notification =
+      (await this.notificationsRepository.markNotificationAsRead(notificationId, userId)) ??
+      (await this.notificationsRepository.findOne({ _id: notificationId, recipient: userId }));
+    if (!notification) throw new NotFoundException('Notification not found');
+    return notification;
+  }
+
+  /** @returns How many notifications were unread. */
+  async markAllAsRead(userId: string): Promise<number> {
+    const { modifiedCount } = await this.notificationsRepository.markAllNotificationsAsReadForUser(userId);
+    return modifiedCount;
   }
 }

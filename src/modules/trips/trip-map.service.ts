@@ -1,18 +1,21 @@
-import type { DataResponseDto } from '@common';
 import { IncidentCategory } from '@common/enums';
 import { INCIDENT_CATEGORY } from '@modules/incidents/incident-category';
 import { IncidentsService } from '@modules/incidents/incidents.service';
-import type { TripIncidentFilter } from '@modules/incidents/incidents.repository';
+import type { TripIncidentFilter, TripIncidentOptions } from '@modules/incidents/incidents.repository';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import type { IncidentMarkerDto, RoutePointDto, TimelineEventDto, TripMapDto, TripRouteDto } from './response';
-import { canViewTrip, type TripViewer } from './trip-access';
 import { buildSpeedSegments, classifySpeed, DEFAULT_NEAR_LIMIT_TOLERANCE_PERCENT, resolveSpeedLimit, sampleRoute } from './trip-route';
 import { TripRouteRepository, type RouteTimeRange } from './trip-route.repository';
-import type { TripMapQueryDto, TripRouteQueryDto } from './trip_map.dto';
+import type { TripIncidentsQueryDto, TripMapQueryDto, TripRouteQueryDto } from './trip_map.dto';
 import { TripsRepository, type MapTripRow } from './trips.repository';
 
 const secondsSince = (start: Date, at: Date): number => (at.getTime() - start.getTime()) / 1000;
+
+const INCIDENT_SORTS: Record<TripIncidentsQueryDto['sort'], TripIncidentOptions['sort']> = {
+  occurredAt: { occurredAt: 1 },
+  '-pointsDeducted': { pointsDeducted: -1, occurredAt: 1 },
+};
 
 // The trip page's map: the GPS route coloured by speed, the incident markers, and the timeline under it
 @Injectable()
@@ -23,60 +26,52 @@ export class TripMapService {
     private readonly incidentsService: IncidentsService,
   ) {}
 
-  async getRoute(viewer: TripViewer, tripId: Types.ObjectId, query: TripRouteQueryDto): Promise<DataResponseDto<TripRouteDto>> {
-    const trip = await this.findViewableTrip(viewer, tripId);
-    return { message: 'Trip route', data: await this.buildRoute(trip, query) };
+  async getRoute(tripId: Types.ObjectId, query: TripRouteQueryDto): Promise<TripRouteDto> {
+    const trip = await this.findTrip(tripId);
+    return this.buildRoute(trip, query);
   }
 
-  async getIncidents(
-    viewer: TripViewer,
-    tripId: Types.ObjectId,
-    filter: TripIncidentFilter,
-  ): Promise<DataResponseDto<IncidentMarkerDto[]>> {
-    const trip = await this.findViewableTrip(viewer, tripId);
-    return { message: 'Trip incidents', data: await this.buildIncidentMarkers(trip, filter) };
+  async getIncidents(tripId: Types.ObjectId, { eventType, severity, sort, limit }: TripIncidentsQueryDto): Promise<IncidentMarkerDto[]> {
+    const trip = await this.findTrip(tripId);
+    return this.buildIncidentMarkers(trip, { eventType, severity }, { sort: INCIDENT_SORTS[sort], limit });
   }
 
-  async getMap(viewer: TripViewer, tripId: Types.ObjectId, { maxPoints }: TripMapQueryDto): Promise<DataResponseDto<TripMapDto>> {
-    const trip = await this.findViewableTrip(viewer, tripId);
+  async getMap(tripId: Types.ObjectId, { maxPoints }: TripMapQueryDto): Promise<TripMapDto> {
+    const trip = await this.findTrip(tripId);
     const [route, incidents] = await Promise.all([this.buildRoute(trip, { maxPoints }), this.buildIncidentMarkers(trip)]);
 
     const durationSeconds = trip.durationSeconds ?? null;
     return {
-      message: 'Trip map data',
-      data: {
-        trip: {
-          id: trip._id.toString(),
-          code: trip.code,
-          status: trip.status,
-          startedAt: trip.startedAt.toISOString(),
-          endedAt: durationSeconds === null ? null : new Date(trip.startedAt.getTime() + durationSeconds * 1000).toISOString(),
-          durationSeconds,
-          distanceKm: trip.distanceKm ?? null,
-          speedLimitKmh: trip.speedLimitKmh ?? null,
-        },
-        route,
-        incidents,
-        timeline: {
-          drivingActions: this.timelineRow(incidents, IncidentCategory.DRIVING_ACTION),
-          driverStates: this.timelineRow(incidents, IncidentCategory.DRIVER_STATE),
-        },
-        metadata: {
-          hasRoute: route.points.length > 0,
-          hasIncidents: incidents.length > 0,
-          incidentsWithoutLocation: incidents.filter((incident) => incident.location === null).length,
-          speedUnit: 'km/h',
-          coordinateSystem: 'WGS84',
-          nearLimitTolerancePercent: DEFAULT_NEAR_LIMIT_TOLERANCE_PERCENT,
-        },
+      trip: {
+        id: trip._id.toString(),
+        code: trip.code,
+        status: trip.status,
+        startedAt: trip.startedAt.toISOString(),
+        endedAt: durationSeconds === null ? null : new Date(trip.startedAt.getTime() + durationSeconds * 1000).toISOString(),
+        durationSeconds,
+        distanceKm: trip.distanceKm ?? null,
+        speedLimitKmh: trip.speedLimitKmh ?? null,
+      },
+      route,
+      incidents,
+      timeline: {
+        drivingActions: this.timelineRow(incidents, IncidentCategory.DRIVING_ACTION),
+        driverStates: this.timelineRow(incidents, IncidentCategory.DRIVER_STATE),
+      },
+      metadata: {
+        hasRoute: route.points.length > 0,
+        hasIncidents: incidents.length > 0,
+        incidentsWithoutLocation: incidents.filter((incident) => incident.location === null).length,
+        speedUnit: 'km/h',
+        coordinateSystem: 'WGS84',
+        nearLimitTolerancePercent: DEFAULT_NEAR_LIMIT_TOLERANCE_PERCENT,
       },
     };
   }
 
-  // A trip the viewer may not see gets the same 404 as a missing one, so trip ids can't be probed
-  private async findViewableTrip(viewer: TripViewer, tripId: Types.ObjectId): Promise<MapTripRow> {
+  private async findTrip(tripId: Types.ObjectId): Promise<MapTripRow> {
     const trip = await this.tripsRepository.findMapTrip(tripId);
-    if (!trip || !canViewTrip(viewer, trip)) throw new NotFoundException('Trip not found');
+    if (!trip) throw new NotFoundException('Trip not found');
     return trip;
   }
 
@@ -114,8 +109,8 @@ export class TripMapService {
     }
   }
 
-  private async buildIncidentMarkers(trip: MapTripRow, filter?: TripIncidentFilter): Promise<IncidentMarkerDto[]> {
-    const incidents = await this.incidentsService.findByTrip(trip._id, filter);
+  private async buildIncidentMarkers(trip: MapTripRow, filter?: TripIncidentFilter, options?: TripIncidentOptions): Promise<IncidentMarkerDto[]> {
+    const incidents = await this.incidentsService.findByTrip(trip._id, filter, options);
     return incidents.map(({ _id, type, severity, occurredAt, location, speedKmh, pointsDeducted, clipUrl }) => ({
       id: _id.toString(),
       type,

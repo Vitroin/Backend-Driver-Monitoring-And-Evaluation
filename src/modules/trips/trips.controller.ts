@@ -8,10 +8,10 @@ import { Types } from 'mongoose';
 import {
   accelerationPointSchema,
   detectedEventSchema,
-  filteredTripSchema,
   recentTripSchema,
   speedPointSchema,
   steeringPointSchema,
+  tripListItemSchema,
   tripOverallSchema,
   tripTotalsSchema,
   type AccelerationPointDto,
@@ -35,7 +35,7 @@ export class TripsController {
   @ApiOperation({
     summary: "A driver's trips matching the filters, newest first and paginated, each with its incidents",
   })
-  @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(filteredTripSchema.array()) })
+  @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(tripListItemSchema.array()) })
   @Get('filteredTrips/:driverId')
   getFilteredTrips(
     @Param('driverId', ParseObjectIdPipe) driverId: string,

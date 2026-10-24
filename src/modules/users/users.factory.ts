@@ -15,7 +15,7 @@ export class UsersFactory {
     user.age = dto.age;
     user.gender = dto.gender;
     user.role = dto.role;
-    if (dto.organization) user.organization = [new Types.ObjectId(dto.organization)];
+    user.organization = new Types.ObjectId(dto.organization);
     return user;
   }
 

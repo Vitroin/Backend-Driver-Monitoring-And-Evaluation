@@ -2,15 +2,18 @@ import { TripStatus } from '@common/enums';
 import { BaseRepository } from '@common/repositories';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, QueryFilter, Types } from 'mongoose';
+import { Model, QueryFilter, Types, UpdateQuery } from 'mongoose';
 import type { ScoredTrip } from './trip-scoring';
-import { Trip, TripDocument } from './trips.model';
+import { OPEN_TRIP_STATUSES, Trip, TripDocument } from './trips.model';
 import { TripsFilterDto } from './trips_filter.dto';
 import { Incident } from '@modules/incidents/incidents.model';
 import type { User } from '@modules/users/user.model';
 
 export type TripTotals = { trips: number; distanceKm: number; durationSeconds: number };
 export type ScoredTripRow = ScoredTrip & { _id: Types.ObjectId; code: string };
+export type ScoreHistoryRow = Pick<Trip, 'code' | 'startedAt'> & { _id: Types.ObjectId; score: number };
+// The readings behind the trip's speed, acceleration and steering motion graphs
+export type MotionReadings = Required<Pick<Trip, 'tripSpeeds' | 'tripAccelerations' | 'steeringWheelAngle'>>;
 export type MapTripRow = Pick<
   Trip,
   'code' | 'status' | 'startedAt' | 'durationSeconds' | 'distanceKm' | 'speedLimitKmh' | 'driver' | 'organization'
@@ -85,7 +88,7 @@ export class TripsRepository extends BaseRepository<Trip> {
   //---------- used by the Trip Map  ----------------
 
   // The trip map's summary fields, plus driver and organization for the access check.
-  // lean() also skips the incidents autopopulate; the map loads them with its own filtered query.
+  // The map loads the incidents with its own filtered query.
   findMapTrip(tripId: string | Types.ObjectId): Promise<MapTripRow | null> {
     return this.tripModel
       .findById(tripId)
@@ -249,5 +252,58 @@ export class TripsRepository extends BaseRepository<Trip> {
         },
       },
     ]);
+  }
+
+  //---------------------------------------------------------------
+  //---------- used by the drivers module ----------------
+
+  // What the long-term score is computed from: every scored trip's score, length and date
+  findScoredTrips(driverId: string | Types.ObjectId): Promise<ScoredTrip[]> {
+    return this.tripModel
+      .find({ driver: driverId, status: TripStatus.COMPLETED, score: { $ne: null } })
+      .select('score durationSeconds startedAt -_id')
+      .lean<ScoredTrip[]>()
+      .exec();
+  }
+
+  // One point per scored trip, oldest first (the score-over-time chart)
+  scoreHistory(driverId: string | Types.ObjectId): Promise<ScoreHistoryRow[]> {
+    return this.tripModel
+      .find({ driver: driverId, status: TripStatus.COMPLETED, score: { $ne: null } })
+      .select('code startedAt score')
+      .sort({ startedAt: 1 })
+      .lean<ScoreHistoryRow[]>()
+      .exec();
+  }
+
+  //---------------------------------------------------------------
+  //---------- used by TripIngestionService ----------------
+
+  // $addToSet, so a reading sent twice is stored once
+  async addMotionReadings(tripId: Types.ObjectId, { tripSpeeds, tripAccelerations, steeringWheelAngle }: MotionReadings): Promise<void> {
+    await this.tripModel
+      .updateOne(
+        { _id: tripId },
+        {
+          $addToSet: {
+            tripSpeeds: { $each: tripSpeeds },
+            tripAccelerations: { $each: tripAccelerations },
+            steeringWheelAngle: { $each: steeringWheelAngle },
+          },
+        },
+      )
+      .exec();
+  }
+
+  // Only while the trip is still open, so two requests can't both complete it; null if it no longer is.
+  // The updated trip comes back without its motion readings, which can be thousands of entries.
+  updateOpenTrip(tripId: Types.ObjectId, update: UpdateQuery<Trip>): Promise<TripDocument | null> {
+    return this.tripModel
+      .findOneAndUpdate({ _id: tripId, status: { $in: OPEN_TRIP_STATUSES } }, update, {
+        new: true,
+        runValidators: true,
+        projection: { tripSpeeds: 0, tripAccelerations: 0, steeringWheelAngle: 0 },
+      })
+      .exec();
   }
 }

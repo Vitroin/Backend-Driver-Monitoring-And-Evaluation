@@ -7,4 +7,3 @@ export * from './login.dto';
 export * from './password.schema';
 export * from './refresh-token.dto';
 export * from './reset-password.dto';
-export * from './validate-reset-password-otp.dto';

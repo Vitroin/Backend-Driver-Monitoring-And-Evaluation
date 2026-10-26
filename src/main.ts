@@ -10,6 +10,8 @@ async function bootstrap() {
     process.loadEnvFile();
   } catch {
     // No .env file: the variables come from the environment (Docker, CI)
+    // eslint-disable-next-line no-console
+    console.warn('No .env file found, using environment variables');
   }
   const env = environmentVariablesValidationSchema.parse(process.env);
 

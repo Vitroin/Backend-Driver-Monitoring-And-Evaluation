@@ -1,22 +1,20 @@
 import type { DataResponseDto } from '@common';
 import { IncidentType } from '@common/enums';
-import { Injectable, NotFoundException } from '@nestjs/common';
 import { IncidentsService } from '@modules/incidents/incidents.service';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import type {
   AccelerationPointDto,
   DetectedEventDto,
-  LastTripScoreDto,
   RecentTripDto,
   SpeedPointDto,
   SteeringPointDto,
   TripOverallDto,
-  TripTotalsDto,
+  TripTotalsDto
 } from './response';
-import { average, longTermScore, riskForScore, roundToOneDecimal } from './trip-scoring';
-import { TripDocument } from './trips.model';
+import { type ScorePointDto } from './response/score-overview.response';
+import { longTermScore, roundToOneDecimal } from './trip-scoring';
 import { TripsRepository, type TripTotals } from './trips.repository';
-import { ScoreOverviewDto, type ScorePointDto } from './response/score-overview.response';
 import { TripsFilterDto } from './trips_filter.dto';
 
 // "Last trip score" compares the last trip with the average of the 5 before it

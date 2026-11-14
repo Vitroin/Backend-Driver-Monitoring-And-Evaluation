@@ -2,7 +2,7 @@ import type { DataResponseDto } from '@common';
 import { IncidentCategory } from '@common/enums';
 import { INCIDENT_CATEGORY } from '@modules/incidents/incident-category';
 import { IncidentsService } from '@modules/incidents/incidents.service';
-import type { TripIncidentFilter } from '@modules/incidents/incidents.repository';
+import type { TripIncidentFilter } from '@modules/incidents/incidents.types';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import type { IncidentMarkerDto, RoutePointDto, TimelineEventDto, TripMapDto, TripRouteDto } from './response';

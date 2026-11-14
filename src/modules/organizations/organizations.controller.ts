@@ -3,7 +3,11 @@ import { ParseObjectIdPipe } from '@nestjs/mongoose';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { OrganizationsService } from './organizations.service';
-import { createdOrganizationResponseSchema, employeeInvitedResponseSchema, organizationListResponseSchema } from './response/organization.response';
+import {
+  createdOrganizationResponseSchema,
+  employeeInvitedResponseSchema,
+  organizationListResponseSchema,
+} from './response/organization.response';
 import { AllowedRoles, Public } from '@common';
 import { UserRole } from '@common/enums';
 import { CreateOrganizationSchema, type CreateOrganizationDto } from './dtos/create-organization.dto';
@@ -24,7 +28,6 @@ export class OrganizationsController {
     return await this.organizationsService.findAllOrganizations();
   }
 
-
   @ApiBearerAuth()
   @AllowedRoles([UserRole.SUPER_ADMIN])
   @ApiOperation({
@@ -43,8 +46,6 @@ export class OrganizationsController {
     return await this.organizationsService.createOrganization(dto);
   }
 
-
-  
   // @ApiBearerAuth()
   @Public()
   @ApiOperation({
@@ -52,7 +53,7 @@ export class OrganizationsController {
     description:
       'Creates a new user in the organization, with a role that depends on the organization type: driver instructor for a driving school, fleet analyst for a fleet company, insurance analyst for an insurance company. The employee is emailed a link to set their password.',
   })
-  @ApiParam({ name: 'organizationId', type: String, example: '665f1c2e8b3e4a1d2c9f0a12' })
+  @ApiParam({ name: 'organizationId', type: String, example: '9f3175354c863c635b87ad30' })
   @ApiResponse({ status: 201, standardSchema: employeeInvitedResponseSchema })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 401, description: 'Not logged in' })

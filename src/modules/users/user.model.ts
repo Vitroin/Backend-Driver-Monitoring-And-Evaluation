@@ -1,8 +1,8 @@
-import { Language } from '@common/enums';
+import { Language, UserGender } from '@common/enums';
 import { UserRole } from '@common/enums/user/user_roles.enum';
 import { UserStatus } from '@common/enums/user/user_status.enum';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { HydratedDocument, SchemaTypes, Types } from 'mongoose';
+import  { HydratedDocument, Types } from 'mongoose';
 
 export type UserDocument = HydratedDocument<User>;
 
@@ -40,8 +40,8 @@ export class User {
   @Prop({ required: true })
   age: number;
 
-  @Prop({ required: true })
-  gender: string;
+  @Prop({ type: String, required: true, enum: UserGender, default: UserGender.MALE })
+  gender: UserGender;
 
   @Prop({ required: true, type: String, enum: UserStatus, default: UserStatus.WAITING_FOR_ACTIVATION })
   status: UserStatus;
@@ -54,7 +54,6 @@ export class User {
 
   @Prop({ default: true })
   mustChangePassword: boolean;
-
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

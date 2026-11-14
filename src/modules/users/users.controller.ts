@@ -45,7 +45,7 @@ export class UsersController {
   })
   @ApiResponse({
     status: 200,
-    standardSchema: objectIdSchema.meta({ example: '665f1c2e8b3e4a1d2c9f0a12' }).array(),
+    standardSchema: objectIdSchema.meta({ example: '9f3175354c863c635b87ad30' }).array(),
   })
   @ApiResponse({ status: 404, description: 'User not found' })
   @Get('me/organizations')

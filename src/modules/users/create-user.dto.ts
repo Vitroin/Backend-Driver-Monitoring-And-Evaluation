@@ -1,11 +1,13 @@
-import { UserRole } from '@common/enums';
+import { UserGender, UserRole } from '@common/enums';
 import { emailSchema, fullNameSchema, objectIdSchema } from '@common/types';
 import { z } from 'zod';
 
 export const CreateUserSchema = z.strictObject({
   email: emailSchema,
   fullName: fullNameSchema,
-  gender: z.enum(['male', 'female'], { message: 'Gender must be male or female' }),
+  gender: z.enum([UserGender.MALE, UserGender.FEMALE], {
+    message: `Gender must be one of: ${UserGender.MALE}, ${UserGender.FEMALE}`,
+  }),
   age: z
     .number({ message: 'Age is required and must be a number' })
     .int({ message: 'Age must be a whole number' })

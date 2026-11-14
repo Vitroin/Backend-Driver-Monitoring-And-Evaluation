@@ -3,8 +3,8 @@ import { UserRole, UserStatus } from '@common/enums';
 import { objectIdSchema } from '@common/types';
 
 export const userResponseSchema = z.object({
-  id: objectIdSchema.meta({ example: '665f1c2e8b3e4a1d2c9f0a12' }),
-  username: z.string().meta({ example: 'jane.doe' }),
+  id: objectIdSchema.meta({ example: '9f3175354c863c635b87ad30' }),
+  username: z.string().meta({ example: 'driver1' }),
   email: z.email().meta({ example: 'jane@example.com' }),
   role: z.enum(UserRole),
   status: z.enum(UserStatus),
@@ -40,4 +40,3 @@ export const loginDataSchema = z.discriminatedUnion('passwordChangeRequired', [
 export type LoginDataDto = z.infer<typeof loginDataSchema>;
 
 export const changePasswordDataSchema = z.object({ tokens: tokensResponseSchema });
-

@@ -7,7 +7,7 @@ export const usernameSchema = z
   .toLowerCase()
   .min(3, { message: 'Username must be at least 3 characters long' })
   .max(30, { message: 'Username must be at most 30 characters long' })
-  .meta({ description: 'Unique username', example: 'jane.doe' });
+  .meta({ description: 'Unique username', example: 'driver1' });
 
 /** Trimmed and lowercased first, then checked, so " Jane@Mail.com " is accepted and stored as "jane@mail.com". */
 export const emailSchema = z

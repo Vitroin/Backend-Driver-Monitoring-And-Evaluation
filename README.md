@@ -4,8 +4,6 @@ This is the backend of **Sahi**, a graduation project that watches drivers durin
 
 The API is built with **NestJS 12 on Fastify**, stores data in **MongoDB**, and uses **Redis** for caching, one-time secrets and background jobs. It talks to a separate **FastAPI** AI service for coaching content.
 
-> **Status as of 2026-11-12:** most of the *read side* is built: authentication, driver dashboards, the trip map, PDF reports and notifications storage. The *write side* is not built yet. There is no way to send trips, GPS points or incidents from the vehicle or the AI service, and no code computes trip scores. Today the data comes only from the seed scripts. See [Project status](#9-project-status) for the full list of what is done and what is left.
-
 ---
 
 ## Contents
@@ -46,7 +44,7 @@ Each user has one role. The role an owner or employee gets depends on the organi
 | --- | --- | --- |
 | `super_admin` | — | Invites users, creates organizations, revokes sessions. **Passes every role check.** |
 | `driver` | Driving school (learner) or fleet company | Main user of the dashboards, map, reports and coaching |
-| `driver_instructor` | Driving school (employee) | Has a `drivingStudents` list (Mongoose discriminator). Only one endpoint so far (`/incidents/recentCounts`). |
+| `driver_instructor` | Driving school (employee) | Has a `drivingStudents` list (Mongoose discriminator). Can open their organization's trip maps. No dedicated endpoints yet. |
 | `school_administrator` | Driving school (owner) | Assigned on organization creation. Marked *Future Work*; no endpoints. |
 | `fleet_analyst` | Fleet company (employee) | Can open their organization's trip maps. No dedicated dashboards yet. |
 | `fleet_manager` | Fleet company (owner) | *Future Work* |
@@ -157,17 +155,19 @@ src/
 ├── common/                    # decorators (@Public, @AllowedRoles, @CurrentUser, @CurrentSession),
 │                              # enums, Zod field schemas, BaseRepository, response interfaces, helpers
 ├── shared/                    # TransactionService (Mongo transactions), interceptors/filters (not registered yet)
-├── database/scripts/          # seed.ts, seed-organizations.ts, seed-super-admin.ts
+├── database/
+│   ├── scripts/               # seed.ts, seed-organizations.ts, seed-incidents.ts, seed-super-admin.ts, verify-seed.ts
+│   └── seed/                  # seed-kit.ts (shared seed steps), integrity.ts (reference checks)
 └── modules/
     ├── auth/                  # controller, service, guards, hashing, otp, token/{access,refresh,one-time,jwt}
     ├── users/                 # User model, self-service endpoints
     ├── organizations/         # Organization model, create org + invite owner/employee
     ├── instructors/           # Instructor discriminator (drivingStudents)
     ├── trips/                 # Trip + TripRoutePoint models, dashboards, trip map, scoring helpers
-    ├── incidents/             # Incident model, dashboard aggregations
+    ├── incidents/             # Incident model, GET /incidents/overview, types in incidents.types.ts
     ├── notifications/         # Notification model, Socket.IO gateway
     ├── reports/               # PDF generation (EN / AR)
-    └── fast-api/              # proxy to the FastAPI AI service
+    └── fast-api/              # proxy to the FastAPI AI service (helpers/getFetch.ts; paths in common/constant/fastApi.ts)
 test/                          # e2e tests (vitest.config.e2e.ts)
 ```
 
@@ -200,6 +200,7 @@ Path aliases (see `tsconfig.paths.json`): `@modules`, `@common`, `@shared`, `@co
 - `location` (WGS84) is `null` when no GPS fix was recorded. Such an incident still appears on the timeline, but not on the map.
 - `speedKmh` is nullable. `clipUrl` / `clipPublicId` point to a short Cloudinary clip (intended to be deleted after 90 days).
 - Each incident copies `driver` from its trip, so a driver's incidents can be queried directly.
+- **One endpoint for every incident widget:** `GET /incidents/overview` returns the incidents that cost the most points (at most `limit`), plus `total` and per-type `byType` counts (`count`, `pointsLost`) for **all** incidents that match the same filters (`tripId`, `sinceDays`, `severity`). Both parts come from one `$facet` aggregation, so the list and the counts always describe the same set. Results are always limited to the logged-in driver.
 
 ### 3.3 Trip map
 
@@ -243,7 +244,7 @@ erDiagram
 
 | Collection | Model | Key fields | Indexes / notes |
 | --- | --- | --- | --- |
-| `users` | `User` (+ `Instructor` discriminator on `role`) | `username` (unique, lowercase), `fullName`, `email`, `passwordHash`, `securityStamp`, `role`, `status`, `organization`, `mustChangePassword`, `language` (`en`/`ar`), `deletionRequestedAt`, `age`, `gender`. Instructors also have `drivingStudents[]`. | unique `{email, organization}` |
+| `users` | `User` (+ `Instructor` discriminator on `role`) | `username` (unique, lowercase), `fullName`, `email`, `passwordHash`, `securityStamp`, `role`, `status`, `organization` (one id), `mustChangePassword`, `language` (`en`/`ar`), `deletionRequestedAt`, `age`, `gender` (`MALE`/`FEMALE`, `UserGender` enum). Instructors also have `drivingStudents[]`. | unique `{email, organization}` |
 | `organizations` | `Organization` | `name`, `organizationType`, `organizationOwner` | unique `{name, organizationOwner}`, case-insensitive, only when an owner is set. Virtuals `organizationEmployees`, `organizationDrivers`. |
 | `trips` | `Trip` | `code` (e.g. `T-24013`, unique), `driver`, `organization`, `vehicle`, `status`, `startedAt`, `speedLimitKmh`, measurements, `score`, motion signal arrays | `{driver, startedAt:-1}`, `{organization, startedAt:-1}`. Virtuals `risk` and `incidents` (autopopulated). |
 | `triproutepoints` | `TripRoutePoint` | `trip`, `recordedAt`, `latitude`, `longitude`, `speedKmh`, `speedLimitKmh`, `headingDeg` | unique `{trip, recordedAt}`. A separate collection, because a 90-minute trip at 1 Hz is about 5,400 points. |
@@ -258,7 +259,6 @@ erDiagram
 | `otp:<purpose>:<userId>` | HMAC-SHA256 of the OTP, attempt count, expiry | `OTP_EXPIRY_MINUTES` (default 5) |
 | `one_time_token:<purpose>:<sha256(token)>` | user id | 15 min (forced password change), 8 h (account activation) |
 | `blocked_access_token:<sid>` | `true` (set on logout) | the rest of the access token's lifetime |
-| `incidents:type-counts:21d` | incident counts by type over 21 days | 10 min |
 | BullMQ queue `mail` | email jobs | removed once sent; failed jobs kept for 1 day |
 
 ---
@@ -365,7 +365,7 @@ All routes in this section need the `driver` role.
 | --- | --- | --- | --- |
 | Main dashboard | GET | `/trips/me/totals` | Completed trips, distance, driving time, last trip score and its difference from the last-5 average |
 | Main dashboard | GET | `/trips/me/recent` | The 6 latest scored trips |
-| Main dashboard | GET | `/incidents/significant` | The 5 costliest incidents in the last 60 days |
+| Main dashboard | GET | `/incidents/overview?sinceDays=60&limit=5` | The 5 costliest incidents in the last 60 days (`data.incidents`) |
 | Trips list | GET | `/trips/filteredTrips/:driverId?status&eventType&from&to&page&limit` | Filtered, paginated trips (newest first) with their incidents |
 | Trip report | GET | `/trips/tripOverall/:tripId` | Duration, distance, speeds, events, score, risk |
 | Trip report | GET | `/trips/tripReportHeader/:tripId` | Start time, duration, vehicle, driver name |
@@ -373,14 +373,39 @@ All routes in this section need the `driver` role.
 | Trip report | GET | `/trips/detectedEvents/:tripId` | Incidents: type, severity, time, points |
 | Trip report | GET | `/trips/incidentsCount/:tripId` | Count per incident type (0 for types that did not happen) |
 | Trip report | GET | `/trips/incidentAnalysis/:tripId` | Count and total points lost per type |
-| Trip report | GET | `/incidents/trip/:tripId?limit` | The trip's incidents, most points deducted first |
+| Trip report | GET | `/incidents/overview?tripId=:tripId&limit=5` | The trip's incidents, most points deducted first (`data.incidents`). Another driver's trip returns an empty result. |
 | Trip report | GET | `/trips/speedMotionGraph/:tripId` | Speed over time |
 | Trip report | GET | `/trips/accelerationMotionGraph/:tripId` | Acceleration over time |
 | Trip report | GET | `/trips/steeringMotionGraph/:tripId` | Steering wheel angle over time |
 | My progress | GET | `/trips/progressDetails/:driverId` | Recent average, change since start, long-term average, best trip |
 | My progress | GET | `/trips/progressGraph/:driverId` | Score history (date, score) |
-| My progress | GET | `/incidents/tripIncidentsCount/:driverId` | Where points are lost: count and points per type, all time |
-| My progress | GET | `/incidents/eventMix/:driverId` | Event count per type, all time |
+| My progress | GET | `/incidents/overview?limit=1` | Where points are lost and the event mix: count and points lost per type, all time (`data.byType`) |
+| Car widget, major events | GET | `/incidents/overview?sinceDays=21&severity=medium,high&limit=5` | Major events of the last 3 weeks: counts per type (`data.byType`) and the costliest ones (`data.incidents`) |
+
+#### `GET /incidents/overview`
+
+| Query parameter | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `tripId` | ObjectId | — | Only this trip's incidents |
+| `sinceDays` | integer 1–365 | all time | Only incidents from the last N days |
+| `severity` | comma-separated `low`, `medium`, `high` | all | e.g. `medium,high` |
+| `limit` | integer 1–50 | `5` | How many incidents to return in `incidents`. `total` and `byType` always count **all** matching incidents. |
+
+```json
+{
+  "message": "Incidents",
+  "data": {
+    "incidents": [
+      { "id": "…", "tripId": "…", "type": "speeding", "severity": "high", "occurredAt": "2026-10-16T03:43:58.342Z",
+        "location": { "latitude": 30.05, "longitude": 31.24 }, "speedKmh": 101, "clipUrl": null, "pointsDeducted": 13.9 }
+    ],
+    "total": 30,
+    "byType": [{ "type": "speeding", "count": 6, "pointsLost": 25.1 }]
+  }
+}
+```
+
+`incidents` is sorted by `pointsDeducted` (newest first on ties); `byType` is sorted by `pointsLost`.
 
 ### Trip map — `/trips/:tripId/...`
 
@@ -392,18 +417,16 @@ These routes are open to any logged-in user, with the visibility rules from [3.3
 | GET | `/trips/:tripId/route?from&to&maxPoints` | The route only, optionally for a time window |
 | GET | `/trips/:tripId/incidents?eventType&severity` | Incident markers only, optionally filtered |
 
-### Instructors, reports and AI
+### Reports and AI
 
 | Method | Path | Access | Purpose |
 | --- | --- | --- | --- |
-| GET | `/incidents/recentCounts` | `driver_instructor` | Incident counts by type over the last 21 days (all drivers, cached for 10 min) |
-| GET | `/reports/downloadReport?language=en\|ar` | `driver` | The driver's performance report as a PDF (shown inline) |
-| GET | `/fast-api/health-check` | Public | Checks that the FastAPI service is up |
+| GET | `/reports/downloadReport?language=en\|ar` | `driver` | The driver's performance report as a PDF (shown inline). Its per-type incident table comes from the same query as `/incidents/overview`. |
+| GET | `/fast-api/health-check` | Public | Checks that the FastAPI service is up (calls FastAPI `GET /health/health-check`) |
 | GET | `/fast-api/coachingTips` | `driver` | Proxied from FastAPI `/coach/coachingTips` |
 | GET | `/fast-api/whatWentWell` | `driver` | Proxied from `/coach/whatWentWell` |
 | GET | `/fast-api/whatToImprove` | `driver` | Proxied from `/coach/whatToImprove` |
 | GET | `/fast-api/recommendations` | `driver` | Proxied from `/coach/recommendations` |
-| GET | `/` | User | Hello-world check |
 
 ### WebSocket (Socket.IO) — notifications
 
@@ -507,24 +530,43 @@ Then open **http://localhost:3000/api**.
 
 ### 7.4 Seed data
 
+All seed scripts run through the Nest build (`nest build && node dist/...`), not `bun file.ts`, because Bun's loader breaks on the decorator metadata of the Mongoose models.
+
 ```bash
-# 1. The first super admin (the seed scripts do not create one). Reads DB_URL from .env.
+# 1. The first super admin (the other seeds do not create one). Does nothing if one already exists.
 bun run seed:super-admin <username> <email> <password> "<Full Name>"
 
 # 2. Demo data: one driving school + one fleet company, 2 instructors, 2 fleet analysts,
 #    8 drivers, 3–6 trips per driver, 0–8 incidents per trip
-bun run seed           # add
-bun run seed:fresh     # wipe the previously seeded data first, then add
+bun run seed           # add (refuses to start if the seeded data is already there)
+bun run seed:fresh     # replace the previously seeded data
 
 # 3. Organization test data: one organization of each type with owner, employees and drivers,
 #    then prints what the organization virtuals return next to the expected counts
 bun run seed:organizations
 bun run seed:organizations:fresh
+
+# 4. Extra mock incidents on trips that already exist; recalculates each touched trip's eventsCount and score
+bun run seed:incidents                                # every completed trip
+bun run seed:incidents -- --trip=T-90001              # one trip
+bun run seed:incidents -- --driver=driver1@sdems.dev  # one driver's trips
+bun run seed:incidents -- --count=5 --seed=7          # exactly 5 per trip, repeatable
+
+# 5. Read-only check of every reference in the database (seeded and real data)
+bun run seed:verify
 ```
 
-- Seeded accounts use the username from their email (`driver1`, `instructor1`, `analyst1`, `school-owner`, `fleet-driver1`, …) and the password **`Password123!`**.
-- Seeding refuses to run when `NODE_ENV=production`, and `--fresh` deletes only seeded data (identified by the `@sdems.dev` / `@orgs.sdems.dev` email domains).
-- The seed does **not** create GPS route points or motion signals. For seeded trips, the trip map route and the speed, acceleration and steering graphs are therefore empty.
+How the seeds work (shared steps in `src/database/seed/seed-kit.ts`):
+
+- **Deterministic:** every id is derived up front from a stable key, so a run gives the same ids and data every time.
+- **All or nothing:** each seed runs in **one transaction**, and every seeded reference is checked (`integrity.ts`) before it commits. A broken reference rolls everything back. This needs MongoDB as a replica set.
+- **Safe re-runs:** without `--fresh`, a seed refuses to start when its data is already there. `--fresh` removes only seeded data (the `@sdems.dev` / `@orgs.sdems.dev` email domains and seeded trip codes `T-9xxxx`) together with everything that points at it.
+- **Production:** seeding refuses to run when `NODE_ENV=production`, except `seed:super-admin` and the read-only `seed:verify`.
+- `seed:verify` lists each broken reference with up to 5 sample ids and exits with code 1 if any are found.
+
+Seeded accounts use the username from their email (`driver1`, `instructor1`, `analyst1`, `school-owner`, `fleet-driver1`, …) and the password **`Password123!`**. Seeded genders are stored as `MALE` / `FEMALE`.
+
+The seeds do **not** create GPS route points or motion signals. For seeded trips, the trip map route and the speed, acceleration and steering graphs are therefore empty. (`seed:incidents` places incidents on a trip's recorded route when it has one, otherwise near Cairo.)
 
 ---
 
@@ -549,15 +591,6 @@ bun run seed:organizations:fresh
 
 Unit tests exist for the token services, guards, OTP service, trip route maths (`trip-route.spec.ts`), trip visibility (`trip-access.spec.ts`) and the trip map service and controller. The other `*.spec.ts` files are Nest CLI placeholders.
 
-**As of 2026-11-12 the suite is not green.** 47 of 59 tests pass, and 17 of 23 spec files fail or do not load. The causes in the code:
-
-- `test/factories/user.factory` is imported by the two guard specs but does not exist.
-- `token.service.spec.ts` imports `./refresh-token.service`, which has moved to `./refresh/`.
-- `otp.service.spec.ts` mocks the config with keys that no longer exist, and expects a 60-second resend cooldown that the service does not enforce.
-- `refresh-token.service.spec.ts` mocks a repository without `createSession`.
-- The placeholder "should be defined" specs (fast-api, incidents, organizations) do not provide the services' dependencies.
-- `test/app.e2e-spec.ts` expects `GET /` to be public, but the global guard requires a token.
-
 ### Docker
 
 The `Dockerfile` has three stages: Bun builds the app, Bun installs production dependencies only, and the result runs on `node:24-alpine` as a non-root user. It exposes port 3000 and runs `node dist/main.js`.
@@ -566,7 +599,7 @@ The `Dockerfile` has three stages: Bun builds the app, Bun installs production d
 docker compose up --build      # api + mongo:8 + redis:8-alpine, reads .env
 ```
 
-> ⚠️ `docker-compose.yml` currently starts MongoDB **without** `--replSet`, so the transactional endpoints fail inside Compose. Add `command: ["--replSet", "rs0"]` to the `mongo` service, run `rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]})` once inside it, and add `?replicaSet=rs0` to the `api` service's `DB_URL`.
+> ⚠️ The `api` service's `DB_URL` already ends in `?replicaSet=rs0`, but the `mongo` service is still started **without** `--replSet`, so the API cannot connect inside Compose. Add `command: ["--replSet", "rs0"]` to the `mongo` service and run `rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]})` once inside it.
 
 ---
 
@@ -601,6 +634,7 @@ docker compose up --build      # api + mongo:8 + redis:8-alpine, reads .env
 
 **Driver experience**
 - [x] Main dashboard: totals, last trip score difference, recent trips, most significant events
+- [x] One incidents endpoint (`/incidents/overview`) for every incident widget: costliest incidents plus total and per-type counts for the same filters, in one query
 - [x] Trips list with status, event type and date filters and pagination
 - [x] Trip report: overall stats, header, statistics, detected events, counts, incident analysis, motion graphs
 - [x] My progress: recent average, change since start, long-term average, best trip, score graph, where points are lost, event mix
@@ -613,7 +647,7 @@ docker compose up --build      # api + mongo:8 + redis:8-alpine, reads .env
 - [x] Socket.IO gateway authenticated with the same JWT guard: list, unread, mark one or all as read
 
 **Data and tests**
-- [x] Deterministic seed scripts (demo data, organizations, super admin)
+- [x] Deterministic, transactional seed scripts (demo data, organizations, extra incidents, super admin) with reference checks before commit, and a read-only `seed:verify`
 - [x] Unit tests for the token services, guards, OTP, trip route maths, trip access and the trip map
 
 ### What's left
@@ -621,17 +655,18 @@ docker compose up --build      # api + mongo:8 + redis:8-alpine, reads .env
 #### P0 — Broken or blocking
 
 - [ ] **Fix `.env.example`** so it matches the variables in [7.2](#72-environment-variables). Today, an `.env` copied from it fails startup validation.
-- [ ] **Run MongoDB as a replica set in `docker-compose.yml`.** Transactions fail on the standalone `mongo` service.
+- [ ] **Run MongoDB as a replica set in `docker-compose.yml`.** The API's `DB_URL` already asks for `replicaSet=rs0`, but the `mongo` service is not started with `--replSet`, so the API cannot connect inside Compose (see [Docker](#docker)).
 - [ ] **Password reset with a validated OTP fails.** `POST /auth/reset-password/validate` *consumes* the OTP when it is correct, so the next `POST /auth/reset-password` with the same code returns "Invalid or expired OTP". Either make validation non-consuming, or have validation return a short-lived reset token that `reset-password` accepts.
-- [ ] **Decide whether `User.organization` is one id or several.** The schema declares a single `ObjectId`. `UsersFactory` assigns an array, and `trip-access.ts` and `GET /users/me/organizations` read it as an array. This mismatch causes the 4 type errors from `tsc`. It also matters at runtime: `canViewTrip` calls `.some()` on it for staff.
-- [ ] **Make the test suite green** (see [Tests](#tests)), then add a CI workflow (`.github/workflows/` is empty) that runs lint, `tsc --noEmit` and the tests.
+- [ ] **Finish making `User.organization` a single id.** The schema and `UsersFactory` now use one `ObjectId`, but `TripViewer` in `trip-access.ts` and `GET /users/me/organizations` still expect an array. This causes the 3 type errors from `tsc` (in `trip-map.controller.ts`). It also matters at runtime: `canViewTrip` calls `.some()` on it for staff, which fails on a single id.
+- [ ] **Existing users with lowercase gender.** `gender` is now the `UserGender` enum (`MALE` / `FEMALE`). Users stored with `male` / `female` fail validation the next time they are saved; run a one-off update on any database that has them (`seed:fresh` fixes seeded data).
+- [ ] **Make the test suite green**, then add a CI workflow (`.github/workflows/` is empty) that runs lint, `tsc --noEmit` and the tests.
 
 #### P1 — Security gaps
 
 - [ ] `GET /users/getAllUsers` is `@Public()` and exposes every user's email, username, role and organization. Restrict it to `super_admin`.
 - [ ] `POST /organizations/:organizationId/inviteEmployee` is `@Public()`, so anyone can create accounts in any organization. Restrict it to `super_admin` and the organization's owner.
 - [ ] Decide whether `GET /organizations/getAllOrganizations` should be public.
-- [ ] **Driver routes do not check ownership.** Routes that take `:driverId` or `:tripId` in `TripsController` and `IncidentsController` only check the `driver` role, so any driver can read another driver's trips and progress. Use the logged-in user's id (`me/...` routes) or reuse `canViewTrip()`, as the trip map does.
+- [ ] **Trip routes do not check ownership.** Routes that take `:driverId` or `:tripId` in `TripsController` only check the `driver` role, so any driver can read another driver's trips and progress. Use the logged-in user's id, as `/incidents/overview` does, or reuse `canViewTrip()`, as the trip map does.
 - [ ] The `createNotification` socket event lets any client create notifications for any user. Notifications should only be created inside the server.
 - [ ] Enforce the OTP resend cooldown. `OTP_RESEND_COOLDOWN_SECONDS` is declared but never used.
 - [ ] Revoke the whole session when a used refresh token is presented again (replay detection). The Swagger text says this happens, but the code only rejects the token.
@@ -647,7 +682,7 @@ docker compose up --build      # api + mongo:8 + redis:8-alpine, reads .env
 - [ ] **Real-time push.** Join each socket to a per-user room and `emit` new notifications. The gateway only answers requests today.
 - [ ] **Cloudinary event clips.** Add the SDK, upload clips, store `clipUrl` and `clipPublicId`, and add a scheduled job that deletes clips after 90 days. The config is required at startup but no code uses it.
 - [ ] **Account deletion.** A request is recorded, but no admin endpoint or scheduled job deletes the account and its data.
-- [ ] **Instructor features.** `InstructorsController` is empty. Expose assigning and removing students, the instructor's student list, and dashboards for the students' trips. Scope `/incidents/recentCounts` to the instructor's students or organization; today it counts all drivers.
+- [ ] **Instructor features.** `InstructorsController` is empty. Expose assigning and removing students, the instructor's student list, and dashboards for the students' trips. Open `/incidents/overview` to instructors and organization staff by working out, from the logged-in user, which drivers they may see (a driver: themselves; an instructor: `drivingStudents`; staff and owners: their organization's drivers), with an optional `driverId` checked against that list. Add the driver's name to each incident for those views.
 - [ ] **Fleet and insurance analyst dashboards** (organization-wide trip and incident views), and the manager and administrator roles (marked *Future Work*).
 - [ ] **User and organization administration:** resend an invitation (the activation link expires after 8 hours and nothing can resend it), deactivate or reactivate users, list an organization's members, expose `assignOrganizationOwner()`, and paginate `getAllUsers`.
 - [ ] An endpoint to change the user's `language`. It is stored and used by the in-vehicle unit's voice prompts, but nothing can update it.
@@ -657,9 +692,10 @@ docker compose up --build      # api + mongo:8 + redis:8-alpine, reads .env
 
 #### Tech debt and cleanup
 
-- [ ] Use one response shape everywhere: `{ message, data }`. Organization and user routes return `{ success, data }`, `/incidents/recentCounts` and `/users/me/organizations` return raw values, and `progressDetails` nests a `{ message, data }` inside `data` and returns raw aggregate arrays.
+- [ ] Use one response shape everywhere: `{ message, data }`. Organization and user routes return `{ success, data }`, `/users/me/organizations` returns a raw value, and `progressDetails` nests a `{ message, data }` inside `data` and returns raw aggregate arrays.
 - [ ] `TripsRepository.progressGraph` sorts on `date`, which does not exist. It should sort on `startedAt`.
-- [ ] `GET /incidents/trip/:tripId` uses `@Query() limit: number`, which receives the whole query object instead of the `limit` value. Validate it with a Zod query schema.
+- [ ] Remove the unused incident response schemas `significant-event.response.ts` and `trip-incidents.response.ts` (and their exports in `incidents/response/index.ts`).
+- [ ] Some trip-report routes overlap with `/incidents/overview` (`/trips/detectedEvents/:tripId`, `/trips/incidentsCount/:tripId`, `/trips/incidentAnalysis/:tripId`). Move the trip report to `/incidents/overview?tripId=` and remove them.
 - [ ] Use REST-style route names. Mixed styles today: `/getAllUsers`, `/createOrganization`, `/tripOverall/:id` next to `/me/totals` and `/:tripId/map`.
 - [ ] `Organization.organizationDrivers` uses `foreignField: 'User'`, which does not exist. Both organization virtuals also sort on `occurredAt`, which users do not have.
 - [ ] Move the motion signals (`tripSpeeds`, `tripAccelerations`, `steeringWheelAngle`) to their own collection, as was done for route points. Their sub-classes also lack `@Prop` decorators. `tripSpeedLimits` duplicates `speedLimitKmh`, and the risk thresholds are defined in both `trips.model.ts` and `trip-scoring.ts`.
@@ -667,7 +703,7 @@ docker compose up --build      # api + mongo:8 + redis:8-alpine, reads .env
 - [ ] Remove dead code: the empty `shared/guards/*.ts` and `shared/repositories/base.repository.ts`, `common/helpers/otp.helper.ts`, the `OTP_TTL` constant, and the unregistered interceptors and filter. Alternatively, register the ones that are wanted (a timeout or logging interceptor).
 - [ ] `send-mail.helper.ts` creates a new Nodemailer transport for every email and reads `process.env` directly. Create one transport, configured through `ConfigService`.
 - [ ] Set `autoIndex: false` in production and build the indexes during deployment.
-- [ ] `GET /` (hello world) requires a token. Make it a public health check, or remove it.
+- [ ] Add a public health check for the API itself (the hello-world `GET /` was removed), and update `test/app.e2e-spec.ts`.
 
 ---
 

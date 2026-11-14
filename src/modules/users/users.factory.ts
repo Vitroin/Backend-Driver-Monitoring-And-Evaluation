@@ -15,11 +15,11 @@ export class UsersFactory {
     user.age = dto.age;
     user.gender = dto.gender;
     user.role = dto.role;
-    if (dto.organization) user.organization = [new Types.ObjectId(dto.organization)];
+    if (dto.organization) user.organization = new Types.ObjectId(dto.organization);
     return user;
   }
 
-  /** "jane.doe@mail.com" -> "jane-doe-k3x9q". Each call gives a new random part, so call again if the username is taken. */
+  /** "driver1@mail.com" -> "driver1-k3x9q". Each call gives a new random part, so call again if the username is taken. */
   generateUsername(email: string): string {
     // Capped at 24 so the "-" and 5 random characters stay within the login form's 30
     const slug = email
@@ -30,7 +30,10 @@ export class UsersFactory {
       .slice(0, 24)
       .replace(/^-+|-+$/g, '');
     // 5 random lowercase letters/digits (about 60 million combinations per slug)
-    const suffix = crypto.randomInt(36 ** 5).toString(36).padStart(5, '0');
+    const suffix = crypto
+      .randomInt(36 ** 5)
+      .toString(36)
+      .padStart(5, '0');
     return slug ? `${slug}-${suffix}` : suffix;
   }
 }

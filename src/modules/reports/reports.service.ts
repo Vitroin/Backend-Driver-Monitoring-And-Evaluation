@@ -188,14 +188,15 @@ export class ReportsService {
       [longTerm],
       { data: totals },
       {
-        data: { incidents },
+        data: { total: totalIncidents, byType: incidents },
       },
       recentTrips,
       recommendations,
     ] = await Promise.all([
       this.tripsService.averageLongTermScore(driverId),
       this.tripsService.getTotals(driverId),
-      this.incidentsService.getAllIncidentsForTrip(driverId),
+      // all-time counts per type; limit 1 because only byType and total are used
+      this.incidentsService.getMyIncidents(driverId, { limit: 1 }),
       this.tripsService.filterTrips(driverId, { status: TripStatus.COMPLETED, page: 1, limit: RECENT_TRIPS_COUNT }),
       this.getRecommendations(),
     ]);
@@ -206,13 +207,13 @@ export class ReportsService {
       reportPeriod: 'All time',
       averageScore: Math.round(longTerm?.averageScore ?? 0),
       totalTrips: totals.trips,
-      totalIncidents: incidents.reduce((sum, { count }) => sum + count, 0),
+      totalIncidents,
       totalDrivingMinutes: Math.round(totals.durationSeconds / 60),
       // "harsh_braking" -> "harsh braking"
-      incidents: incidents.map(({ _id, count, totalDeduction }) => ({
-        type: _id.replaceAll('_', ' '),
+      incidents: incidents.map(({ type, count, pointsLost }) => ({
+        type: type.replaceAll('_', ' '),
         count,
-        pointsLost: totalDeduction,
+        pointsLost,
       })),
       trips: recentTrips.map((trip) => ({
         date: trip.startedAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),

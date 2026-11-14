@@ -7,10 +7,12 @@
   "license": "UNLICENSED",
   "scripts": {
     "seed": "nest build && node dist/database/scripts/seed.js",
+    "seed:incidents": "nest build && node dist/database/scripts/seed-incidents.js",
     "seed:fresh": "nest build && node dist/database/scripts/seed.js --fresh",
     "seed:organizations": "nest build && node dist/database/scripts/seed-organizations.js",
     "seed:organizations:fresh": "nest build && node dist/database/scripts/seed-organizations.js --fresh",
-    "seed:super-admin": "bun src/database/scripts/seed-super-admin.ts",
+    "seed:super-admin": "nest build && node dist/database/scripts/seed-super-admin.js",
+    "seed:verify": "nest build && node dist/database/scripts/verify-seed.js",
     "build": "nest build",
     "deploy": "nest deploy",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",

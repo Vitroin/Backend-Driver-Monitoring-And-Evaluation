@@ -13,6 +13,7 @@ export enum ConfigNames {
   REDIS_HOST = 'redis.host',
   REDIS_PORT = 'redis.port',
 
+  APP_PORT = 'app.port',
   APP_CLIENT_URL = 'app.clientUrl',
   APP_CLIENT_PORT = 'app.clientPort',
 

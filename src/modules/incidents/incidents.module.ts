@@ -4,10 +4,9 @@ import { IncidentsController } from './incidents.controller';
 import { Incident, IncidentSchema } from './incidents.model';
 import { IncidentsRepository } from './incidents.repository';
 import { IncidentsService } from './incidents.service';
-import { AppCacheModule } from '@infrastructure/cache';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: Incident.name, schema: IncidentSchema }]), AppCacheModule],
+  imports: [MongooseModule.forFeature([{ name: Incident.name, schema: IncidentSchema }])],
   controllers: [IncidentsController],
   providers: [IncidentsService, IncidentsRepository],
   exports: [IncidentsService],

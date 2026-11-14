@@ -1,87 +1,57 @@
 import type { DataResponseDto } from '@common';
 import { Injectable } from '@nestjs/common';
 import { Types } from 'mongoose';
-import { IncidentsRepository, type TripIncidentFilter, type TripIncidentRow } from './incidents.repository';
-import type { SignificantEventDto } from './response/significant-event.response';
-import { CacheService } from '@infrastructure/cache';
-import { IncidentType } from '@common/enums';
+import { IncidentsRepository } from './incidents.repository';
+import type { IncidentRow, TripIncidentFilter } from './incidents.types';
+import type { IncidentsOverviewDto } from './response/incidents-overall.response';
+import type { MyIncidentsQueryDto } from './dtos/my-incidents.query';
 
-// "Most significant events": the 5 incidents that cost the most points in the last 60 days
-const SIGNIFICANT_EVENTS_DAYS = 60;
-const SIGNIFICANT_EVENTS_LIMIT = 5;
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-const WINDOW_DAYS = 21;
-const TYPE_COUNTS_KEY = 'incidents:type-counts:21d';
+const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS);
 
 @Injectable()
 export class IncidentsService {
-  constructor(
-    private readonly incidentsRepository: IncidentsRepository,
-    private readonly cacheService: CacheService,
-  ) {}
+  constructor(private readonly incidentsRepository: IncidentsRepository) {}
 
-  // Used in the Main Dashboard: the 5 incidents that cost the most points in the last 60 days
-  async getIncidents(driverId: string): Promise<DataResponseDto<SignificantEventDto[]>> {
-    const since = new Date(Date.now() - SIGNIFICANT_EVENTS_DAYS * DAY_MS);
-    const incidents = await this.incidentsRepository.findMostSignificant(driverId, since, SIGNIFICANT_EVENTS_LIMIT);
+  // Main Dashboard, Trip Report, car widget and major events all use this, each with different filters
+  async getMyIncidents(
+    driverId: string,
+    { tripId, sinceDays, severity, limit }: MyIncidentsQueryDto,
+  ): Promise<DataResponseDto<IncidentsOverviewDto>> {
+    const { incidents, total, byType } = await this.incidentsRepository.findOverview(
+      {
+        driver: driverId,
+        trip: tripId,
+        since: sinceDays ? daysAgo(sinceDays) : undefined,
+        severities: severity,
+      },
+      limit,
+    );
+
     return {
-      message: 'Most significant events',
-      data: incidents.map(({ _id, type, severity, occurredAt, pointsDeducted }) => ({
-        id: _id.toString(),
-        type,
-        severity,
-        occurredAt: occurredAt.toISOString(),
-        pointsDeducted,
-      })),
+      message: 'Incidents',
+      data: {
+        incidents: incidents.map((i) => ({
+          id: i._id.toString(),
+          tripId: i.trip.toString(),
+          type: i.type,
+          severity: i.severity,
+          occurredAt: i.occurredAt.toISOString(),
+          location: i.location,
+          speedKmh: i.speedKmh,
+          clipUrl: i.clipUrl,
+          pointsDeducted: i.pointsDeducted,
+        })),
+        total,
+        byType,
+      },
     };
   }
-
-  // Used in the Trip Report Dashboard: a trip's incidents, most points deducted first
-  async getTopIncidentsForTrip(tripId: Types.ObjectId, limit: number) {
-    const incidents = await this.incidentsRepository.findByTrip(tripId, {}, { sort: { pointsDeducted: -1 }, limit });
-    return {
-      message: 'Top incidents for trip',
-      data: { incidents },
-    };
-  }
-  //--------------------------------------------------
-  //---------- used by the Progress Dashboard's ----------------
-
-  //gets all points lost for driver regarding his overall history, inorder to generate component ' Where points are lost '
-  async getAllIncidentsForTrip(driverId: string | Types.ObjectId) {
-    const incidents = await this.incidentsRepository.sumDeductionsByType(driverId);
-    return {
-      message: 'All incidents for trip',
-      data: { incidents },
-    };
-  }
-
-  //gets the all event counts for driver regarding his overall history, inorder to generate chart
-  async getEventMix(driverId: string | Types.ObjectId) {
-    const incidents = await this.incidentsRepository.countIncidentsByType(driverId);
-    return {
-      message: 'All Event Mix',
-      data: { incidents },
-    };
-  }
-
-  //--------------------------------------------------
 
   // ---------- used by other modules ----------
 
   // One trip's incidents, oldest first (the trip map's markers and timeline)
-  findByTrip(tripId: Types.ObjectId, filter?: TripIncidentFilter): Promise<TripIncidentRow[]> {
+  findByTrip(tripId: Types.ObjectId, filter?: TripIncidentFilter): Promise<IncidentRow[]> {
     return this.incidentsRepository.findByTrip(tripId, filter);
-  }
-
-  async getRecentTypeCounts() {
-    const cached = await this.cacheService.get<{ _id: IncidentType; count: number }[]>(TYPE_COUNTS_KEY);
-    if (cached) return cached;
-
-    const since = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000);
-    const counts = await this.incidentsRepository.countByTypeSince(since);
-    await this.cacheService.set({ key: TYPE_COUNTS_KEY, value: counts, ttl: 10 * 60 });
-    return counts;
   }
 }

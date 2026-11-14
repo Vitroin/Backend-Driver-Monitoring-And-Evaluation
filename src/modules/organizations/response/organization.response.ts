@@ -3,11 +3,13 @@ import { objectIdSchema } from '@common/types';
 import { OrganizationTypes } from '../organizations.enum';
 
 export const organizationResponseSchema = z.object({
-  _id: objectIdSchema.meta({ example: '665f1c2e8b3e4a1d2c9f0a12' }),
-  id: objectIdSchema.meta({ description: 'Same as _id', example: '665f1c2e8b3e4a1d2c9f0a12' }),
+  _id: objectIdSchema.meta({ example: '9f3175354c863c635b87ad30' }),
+  id: objectIdSchema.meta({ description: 'Same as _id', example: '9f3175354c863c635b87ad30' }),
   name: z.string().meta({ example: 'Cairo Driving School' }),
   organizationType: z.enum(OrganizationTypes),
-  organizationOwner: objectIdSchema.nullable().meta({ description: "The owner's user id", example: '665f1c2e8b3e4a1d2c9f0a13' }),
+  organizationOwner: objectIdSchema
+    .nullable()
+    .meta({ description: "The owner's user id", example: '665f1c2e8b3e4a1d2c9f0a13' }),
   createdAt: z.iso.datetime().meta({ example: '2026-10-22T09:30:00.000Z' }),
 });
 export type OrganizationResponseDto = z.infer<typeof organizationResponseSchema>;

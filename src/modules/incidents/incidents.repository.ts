@@ -1,16 +1,9 @@
-import { IncidentSeverity, IncidentType } from '@common/enums';
 import { BaseRepository } from '@common/repositories';
 import { Injectable } from '@nestjs/common';
-import { Incident } from './incidents.model';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, QueryFilter, SortOrder, Types } from 'mongoose';
-
-export type TripIncidentFilter = { eventType?: IncidentType; severity?: IncidentSeverity };
-export type TripIncidentOptions = { sort?: Record<string, SortOrder>; limit?: number };
-export type TripIncidentRow = Pick<
-  Incident,
-  'type' | 'severity' | 'occurredAt' | 'location' | 'speedKmh' | 'clipUrl' | 'pointsDeducted'
-> & { _id: Types.ObjectId };
+import { Model, QueryFilter, Types } from 'mongoose';
+import { Incident } from './incidents.model';
+import type { IncidentOverview, IncidentOverviewFilter, IncidentRow, TripIncidentFilter } from './incidents.types';
 
 @Injectable()
 export class IncidentsRepository extends BaseRepository<Incident> {
@@ -18,76 +11,66 @@ export class IncidentsRepository extends BaseRepository<Incident> {
     super(incidentModel);
   }
 
-  // The 5 incidents that cost the most points in the last 60 days
-  async findMostSignificant(driverId: string | Types.ObjectId, since: Date, limit: number) {
-    return this.incidentModel
-      .find({ driver: driverId, occurredAt: { $gte: since } })
-      .sort({ pointsDeducted: -1 })
-      .limit(limit)
-      .lean()
+  // One query for both the list (top `limit` by points) and the counts (all matching incidents).
+  // Always filtered by driver, so the { driver, occurredAt } index is used.
+  async findOverview({ driver, trip, since, severities }: IncidentOverviewFilter, limit: number) {
+    const [result] = await this.incidentModel
+      .aggregate<IncidentOverview>([
+        {
+          // aggregate() doesn't auto-cast strings to ObjectId like find() does
+          $match: {
+            driver: new Types.ObjectId(driver),
+            ...(trip ? { trip: new Types.ObjectId(trip) } : {}),
+            ...(since ? { occurredAt: { $gte: since } } : {}),
+            ...(severities?.length ? { severity: { $in: severities } } : {}),
+          },
+        },
+        {
+          $facet: {
+            incidents: [
+              { $sort: { pointsDeducted: -1, occurredAt: -1 } },
+              { $limit: limit },
+              {
+                $project: {
+                  trip: 1,
+                  type: 1,
+                  severity: 1,
+                  occurredAt: 1,
+                  location: 1,
+                  speedKmh: 1,
+                  clipUrl: 1,
+                  pointsDeducted: 1,
+                },
+              },
+            ],
+            byType: [
+              { $group: { _id: '$type', count: { $sum: 1 }, pointsLost: { $sum: '$pointsDeducted' } } },
+              { $project: { _id: 0, type: '$_id', count: 1, pointsLost: 1 } },
+              { $sort: { pointsLost: -1 } },
+            ],
+            total: [{ $count: 'value' }],
+          },
+        },
+        // $count returns [] when nothing matched, so turn it into 0
+        { $project: { incidents: 1, byType: 1, total: { $ifNull: [{ $first: '$total.value' }, 0] } } },
+      ])
       .exec();
+
+    return result; // $facet always returns exactly one document, even when nothing matched
   }
 
-  // A trip's incidents, optionally only one type and/or severity.
-  // Chronological unless `sort` says otherwise (uses the { trip, occurredAt } index); `limit` 0 means no limit.
-  findByTrip(
-    tripId: string | Types.ObjectId,
-    { eventType, severity }: TripIncidentFilter = {},
-    { sort = { occurredAt: 1 }, limit = 0 }: TripIncidentOptions = {},
-  ) {
+  // A trip's incidents, oldest first, optionally only one type and/or severity (used by the trip map)
+  findByTrip(tripId: string | Types.ObjectId, { eventType, severity, driver }: TripIncidentFilter = {}) {
     const filter: QueryFilter<Incident> = { trip: tripId };
     if (eventType) filter.type = eventType;
     if (severity) filter.severity = severity;
+    if (driver) filter.driver = driver;
 
     return this.incidentModel
       .find(filter)
-      .select('type severity occurredAt location speedKmh clipUrl pointsDeducted')
-      .sort(sort)
-      .limit(limit)
-      .lean<TripIncidentRow[]>()
+      .select('trip type severity occurredAt location speedKmh clipUrl pointsDeducted')
+      .sort({ occurredAt: 1 })
+      .lean<IncidentRow[]>()
       .exec();
-  }
-
-  //---------- used by the Progress Dashboard's ----------------
-  // Progress Dashboard: A driver's incidents, grouped by type, with the count and total points deducted for each type
-  /// A driver's incidents, grouped by type, with the count and total points deducted for each type
-  sumDeductionsByType(driverId: string | Types.ObjectId) {
-    return this.incidentModel
-      .aggregate<{ _id: IncidentType; count: number; totalDeduction: number }>([
-        { $match: { driver: new Types.ObjectId(driverId) } },
-        {
-          $group: {
-            _id: '$type',
-            count: { $sum: 1 },
-            totalDeduction: { $sum: '$pointsDeducted' },
-          },
-        },
-        {
-          $project: {
-            count: 1,
-            totalDeduction: { $round: ['$totalDeduction', 0] },
-          },
-        },
-      ])
-      .exec();
-  }
-
-  // A driver's incidents, grouped by type, with the count for each type
-  async countIncidentsByType(driverId: string | Types.ObjectId) {
-    return await this.incidentModel
-      .aggregate<{ _id: IncidentType; count: number }>([
-        { $match: { driver: new Types.ObjectId(driverId) } },
-        { $group: { _id: '$type', count: { $sum: 1 } } },
-      ])
-      .exec();
-  }
-
-  // All drivers' incidents, grouped by type, with the count for each type since a given date
-  async countByTypeSince(since: Date) {
-    return this.incidentModel.aggregate<{ _id: IncidentType; count: number }>([
-      { $match: { occurredAt: { $gte: since } } },
-      { $group: { _id: '$type', count: { $sum: 1 } } },
-    ])
-    .exec();
   }
 }

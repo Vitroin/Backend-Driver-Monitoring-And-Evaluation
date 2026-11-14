@@ -31,7 +31,7 @@ import { tripsFilterSchema, type TripsFilterDto } from './trips_filter.dto';
 export class TripsController {
   constructor(private readonly tripsService: TripsService) {}
 
-  @ApiParam({ name: 'driverId', type: String, example: '665f1c2e8b3e4a1d2c9f0a12' })
+  @ApiParam({ name: 'driverId', type: String, example: '9f3175354c863c635b87ad30' })
   @ApiOperation({
     summary: "A driver's trips matching the filters, newest first and paginated, each with its incidents",
   })
@@ -143,13 +143,13 @@ export class TripsController {
   }
 
   //---------- Used By the My Progress Dashboard's ----------------
-  @ApiParam({ name: 'driverId', type: String, example: '665f1c2e8b3e4a1d2c9f0a12' })
+  @ApiParam({ name: 'driverId', type: String, example: '9f3175354c863c635b87ad30' })
   @Get('progressDetails/:driverId')
   progressComponentData(@Param('driverId', ParseObjectIdPipe) driverId: string) {
     return this.tripsService.progressComponentsData(driverId);
   }
 
-  @ApiParam({ name: 'driverId', type: String, example: '665f1c2e8b3e4a1d2c9f0a12' })
+  @ApiParam({ name: 'driverId', type: String, example: '9f3175354c863c635b87ad30' })
   @Get('progressGraph/:driverId')
   progressGraph(@Param('driverId', ParseObjectIdPipe) driverId: string) {
     return this.tripsService.progressGraph(driverId);

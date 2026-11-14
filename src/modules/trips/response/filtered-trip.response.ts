@@ -3,7 +3,7 @@ import { IncidentSeverity, IncidentType, TripStatus } from '@common/enums';
 import { objectIdSchema } from '@common/types';
 
 export const filteredTripIncidentSchema = z.object({
-  _id: objectIdSchema.meta({ example: '665f1c2e8b3e4a1d2c9f0a12' }),
+  _id: objectIdSchema.meta({ example: '9f3175354c863c635b87ad30' }),
   type: z.enum(IncidentType),
   severity: z.enum(IncidentSeverity),
   occurredAt: z.iso.datetime().meta({ example: '2026-10-02T12:49:00.000Z' }),
@@ -12,7 +12,7 @@ export const filteredTripIncidentSchema = z.object({
 });
 
 export const filteredTripSchema = z.object({
-  _id: objectIdSchema.meta({ example: '665f1c2e8b3e4a1d2c9f0a12' }),
+  _id: objectIdSchema.meta({ example: '9f3175354c863c635b87ad30' }),
   code: z.string().meta({ example: 'T-24013' }),
   vehicle: z.string().meta({ example: 'Kart GK-01' }),
   status: z.enum(TripStatus),

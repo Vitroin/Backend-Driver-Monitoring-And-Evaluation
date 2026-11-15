@@ -5,13 +5,18 @@ import { IncidentsService } from '@modules/incidents/incidents.service';
 import type { TripIncidentFilter } from '@modules/incidents/incidents.types';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
-import type { IncidentMarkerDto, RoutePointDto, TimelineEventDto, TripMapDto, TripRouteDto } from './response';
-import { canViewTrip, type TripViewer } from './trip-access';
-import { buildSpeedSegments, classifySpeed, DEFAULT_NEAR_LIMIT_TOLERANCE_PERCENT, resolveSpeedLimit, sampleRoute } from './trip-route';
+import type { IncidentMarkerDto, RoutePointDto, TimelineEventDto, TripMapDto, TripRouteDto } from '../response';
+import { canViewTrip, type TripViewer } from '../helpers/trip-access';
+import {
+  buildSpeedSegments,
+  classifySpeed,
+  DEFAULT_NEAR_LIMIT_TOLERANCE_PERCENT,
+  resolveSpeedLimit,
+  sampleRoute,
+} from './trip-route';
 import { TripRouteRepository, type RouteTimeRange } from './trip-route.repository';
 import type { TripMapQueryDto, TripRouteQueryDto } from './trip_map.dto';
-import { TripsRepository, type MapTripRow } from './trips.repository';
-
+import { TripsRepository, type MapTripRow } from '../trips.repository';
 const secondsSince = (start: Date, at: Date): number => (at.getTime() - start.getTime()) / 1000;
 
 // The trip page's map: the GPS route coloured by speed, the incident markers, and the timeline under it
@@ -23,7 +28,11 @@ export class TripMapService {
     private readonly incidentsService: IncidentsService,
   ) {}
 
-  async getRoute(viewer: TripViewer, tripId: Types.ObjectId, query: TripRouteQueryDto): Promise<DataResponseDto<TripRouteDto>> {
+  async getRoute(
+    viewer: TripViewer,
+    tripId: Types.ObjectId,
+    query: TripRouteQueryDto,
+  ): Promise<DataResponseDto<TripRouteDto>> {
     const trip = await this.findViewableTrip(viewer, tripId);
     return { message: 'Trip route', data: await this.buildRoute(trip, query) };
   }
@@ -37,9 +46,16 @@ export class TripMapService {
     return { message: 'Trip incidents', data: await this.buildIncidentMarkers(trip, filter) };
   }
 
-  async getMap(viewer: TripViewer, tripId: Types.ObjectId, { maxPoints }: TripMapQueryDto): Promise<DataResponseDto<TripMapDto>> {
+  async getMap(
+    viewer: TripViewer,
+    tripId: Types.ObjectId,
+    { maxPoints }: TripMapQueryDto,
+  ): Promise<DataResponseDto<TripMapDto>> {
     const trip = await this.findViewableTrip(viewer, tripId);
-    const [route, incidents] = await Promise.all([this.buildRoute(trip, { maxPoints }), this.buildIncidentMarkers(trip)]);
+    const [route, incidents] = await Promise.all([
+      this.buildRoute(trip, { maxPoints }),
+      this.buildIncidentMarkers(trip),
+    ]);
 
     const durationSeconds = trip.durationSeconds ?? null;
     return {
@@ -50,7 +66,8 @@ export class TripMapService {
           code: trip.code,
           status: trip.status,
           startedAt: trip.startedAt.toISOString(),
-          endedAt: durationSeconds === null ? null : new Date(trip.startedAt.getTime() + durationSeconds * 1000).toISOString(),
+          endedAt:
+            durationSeconds === null ? null : new Date(trip.startedAt.getTime() + durationSeconds * 1000).toISOString(),
           durationSeconds,
           distanceKm: trip.distanceKm ?? null,
           speedLimitKmh: trip.speedLimitKmh ?? null,
@@ -80,7 +97,10 @@ export class TripMapService {
     return trip;
   }
 
-  private async buildRoute(trip: MapTripRow, { from, to, maxPoints }: { from?: Date; to?: Date; maxPoints: number }): Promise<TripRouteDto> {
+  private async buildRoute(
+    trip: MapTripRow,
+    { from, to, maxPoints }: { from?: Date; to?: Date; maxPoints: number },
+  ): Promise<TripRouteDto> {
     const range = { from, to };
     // Counted first so the points can be thinned out while streaming, without loading them all
     const count = await this.tripRouteRepository.countPoints(trip._id, range);
@@ -99,7 +119,10 @@ export class TripMapService {
     for await (const point of this.tripRouteRepository.streamPoints(trip._id, range)) {
       // ?? null: lean() doesn't apply schema defaults, so a field missing from the document comes back undefined
       const speedKmh = point.speedKmh ?? null;
-      const { speedLimitKmh, speedLimitSource } = resolveSpeedLimit(point.speedLimitKmh ?? null, trip.speedLimitKmh ?? null);
+      const { speedLimitKmh, speedLimitSource } = resolveSpeedLimit(
+        point.speedLimitKmh ?? null,
+        trip.speedLimitKmh ?? null,
+      );
       yield {
         latitude: point.latitude,
         longitude: point.longitude,

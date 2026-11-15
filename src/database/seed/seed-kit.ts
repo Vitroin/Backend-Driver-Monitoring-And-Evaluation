@@ -25,8 +25,8 @@ import { Instructor } from '@modules/instructors/instructors.model';
 import { Organization } from '@modules/organizations/organization.model';
 import { OrganizationTypes } from '@modules/organizations/organizations.enum';
 import { Trip } from '@modules/trips/trips.model';
-import { TripRoutePoint } from '@modules/trips/trip-route-point.model';
-import { roundToOneDecimal } from '@modules/trips/trip-scoring';
+import { TripRoutePoint } from '@modules/trips/trip-map/trip-route-point.model';
+import { roundToOneDecimal } from '@modules/trips/helpers/trip-scoring';
 import { Incident } from '@modules/incidents/incidents.model';
 import { Notification } from '@modules/notifications/notifications.model';
 import { RefreshToken } from '@modules/auth/token/refresh/token.model';
@@ -235,10 +235,14 @@ export async function findSeededScope(
   const named = await models.organization
     .find({ name: { $in: organizationNames } }, { _id: 1, organizationOwner: 1 })
     .lean();
-  const ownerIds = named.flatMap((organization) => (organization.organizationOwner ? [organization.organizationOwner] : []));
+  const ownerIds = named.flatMap((organization) =>
+    organization.organizationOwner ? [organization.organizationOwner] : [],
+  );
   const existingOwners = new Set((await models.user.distinct('_id', { _id: { $in: ownerIds } })).map(String));
   const leftOver = named
-    .filter(({ organizationOwner: owner }) => !owner || seededUsers.has(String(owner)) || !existingOwners.has(String(owner)))
+    .filter(
+      ({ organizationOwner: owner }) => !owner || seededUsers.has(String(owner)) || !existingOwners.has(String(owner)),
+    )
     .map((organization) => organization._id);
 
   const organizations = (await models.organization.distinct('_id', {
@@ -276,10 +280,15 @@ export function assertCanSeed(existing: SeedScope, fresh: boolean) {
  */
 export async function assertNoForeignMembers(models: SeedModels, scope: SeedScope) {
   const foreign = await models.user
-    .find({ organization: { $in: scope.organizations }, _id: { $nin: scope.users } }, { email: 1, role: 1, organization: 1 })
+    .find(
+      { organization: { $in: scope.organizations }, _id: { $nin: scope.users } },
+      { email: 1, role: 1, organization: 1 },
+    )
     .lean();
   if (foreign.length === 0) return;
-  console.table(foreign.map((user) => ({ email: user.email, role: user.role, organization: String(user.organization) })));
+  console.table(
+    foreign.map((user) => ({ email: user.email, role: user.role, organization: String(user.organization) })),
+  );
   throw new Error(
     `${foreign.length} non-seeded user(s) belong to seeded organizations (listed above). ` +
       'Move them to another organization, or remove them, before replacing the seeded data.',
@@ -323,15 +332,24 @@ export async function deleteSeeded(models: SeedModels, scope: SeedScope) {
  */
 export async function insertOrganizationsAndUsers(
   models: SeedModels,
-  data: { organizations: SeedOrganization[]; users: SeedUser[]; instructors: (SeedUser & { drivingStudents: Types.ObjectId[] })[] },
+  data: {
+    organizations: SeedOrganization[];
+    users: SeedUser[];
+    instructors: (SeedUser & { drivingStudents: Types.ObjectId[] })[];
+  },
 ) {
-  await models.organization.insertMany(data.organizations.map((organization) => ({ ...organization, organizationOwner: null })));
+  await models.organization.insertMany(
+    data.organizations.map((organization) => ({ ...organization, organizationOwner: null })),
+  );
   if (data.users.length) await models.user.insertMany(data.users);
   // through the discriminator model so the instructor-only field (drivingStudents) is kept
   if (data.instructors.length) await models.instructor.insertMany(data.instructors);
   for (const organization of data.organizations) {
     if (!organization.organizationOwner) continue;
-    await models.organization.updateOne({ _id: organization._id }, { $set: { organizationOwner: organization.organizationOwner } });
+    await models.organization.updateOne(
+      { _id: organization._id },
+      { $set: { organizationOwner: organization.organizationOwner } },
+    );
   }
 }
 

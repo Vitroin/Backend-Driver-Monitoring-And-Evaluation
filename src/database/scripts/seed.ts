@@ -18,7 +18,7 @@ import { Types } from 'mongoose';
 import { faker } from '@faker-js/faker';
 import * as argon2 from 'argon2';
 import { OrganizationTypes } from '@modules/organizations/organizations.enum';
-import { roundToOneDecimal } from '@modules/trips/trip-scoring';
+import { roundToOneDecimal } from '@modules/trips/helpers/trip-scoring';
 import { IncidentType, TripStatus, UserRole } from '@common/enums';
 import {
   assertCanSeed,
@@ -92,7 +92,13 @@ function buildPlan(passwordHash: string) {
   const drivers: SeedUser[] = Array.from({ length: CONFIG.drivers }, (_, i) => {
     const isLearner = i % 2 === 0;
     const email = `driver${i + 1}@${CONFIG.emailDomain}`;
-    const driver = mkUser(UserRole.DRIVER, email.split('@')[0], email, isLearner ? school._id : fleet._id, passwordHash);
+    const driver = mkUser(
+      UserRole.DRIVER,
+      email.split('@')[0],
+      email,
+      isLearner ? school._id : fleet._id,
+      passwordHash,
+    );
     // an instructor of the learner's own organization, so the student link stays inside the school
     if (isLearner) faker.helpers.arrayElement(instructors).drivingStudents.push(driver._id);
     return driver;

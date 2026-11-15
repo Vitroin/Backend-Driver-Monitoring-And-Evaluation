@@ -3,22 +3,16 @@ import { BaseRepository } from '@common/repositories';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, QueryFilter, Types } from 'mongoose';
-import type { ScoredTrip } from './trip-scoring';
 import { Trip, TripDocument } from './trips.model';
-import { TripsFilterDto } from './trips_filter.dto';
+import { TripsFilterDto } from './dtos/trips-filter.dto';
 import { Incident } from '@modules/incidents/incidents.model';
 import type { User } from '@modules/users/user.model';
 
 export type TripTotals = { trips: number; distanceKm: number; durationSeconds: number };
-export type ScoredTripRow = ScoredTrip & { _id: Types.ObjectId; code: string };
 export type MapTripRow = Pick<
   Trip,
   'code' | 'status' | 'startedAt' | 'durationSeconds' | 'distanceKm' | 'speedLimitKmh' | 'driver' | 'organization'
 > & { _id: Types.ObjectId };
-// driver is null if the user document no longer exists
-export type DashboardHeaderRow = Pick<Trip, 'startedAt' | 'durationSeconds' | 'vehicle'> & {
-  driver: Pick<User, 'fullName'> | null;
-};
 
 const EMPTY_TOTALS: TripTotals = { trips: 0, distanceKm: 0, durationSeconds: 0 };
 
@@ -55,16 +49,22 @@ export class TripsRepository extends BaseRepository<Trip> {
       .exec();
   }
 
-  // The driver's trips matching the filter, newest first, each with its incidents in chronological order.
+  // The driver's trips matching the filter, newest first, each with its incidents in chronological order,
+  // plus how many trips match in total (for pagination).
   // With eventType, only incidents of that type are attached and trips without any are left out.
-  filterTrips(driverId: string | Types.ObjectId, { status, eventType, from, to, page, limit }: TripsFilterDto) {
+  async filterTrips(driverId: string | Types.ObjectId, { status, eventType, from, to, page, limit }: TripsFilterDto) {
     // aggregate() doesn't cast like find(), so the id must already be an ObjectId
     const match: QueryFilter<Trip> = { driver: new Types.ObjectId(driverId) };
     if (status) match.status = status;
     if (from || to) match.startedAt = { ...(from && { $gte: from }), ...(to && { $lte: to }) };
 
-    return this.tripModel.aggregate<Trip & { _id: Types.ObjectId; incidents: Incident[] }>([
+    const [result] = await this.tripModel.aggregate<{
+      trips: (Trip & { _id: Types.ObjectId; incidents: Incident[] })[];
+      total: { count: number }[];
+    }>([
       { $match: match },
+      // The motion signals are only needed by the telemetry endpoint
+      { $project: { tripSpeeds: 0, tripAccelerations: 0, steeringWheelAngle: 0 } },
       {
         $lookup: {
           from: 'incidents',
@@ -75,10 +75,17 @@ export class TripsRepository extends BaseRepository<Trip> {
         },
       },
       ...(eventType ? [{ $match: { 'incidents.0': { $exists: true } } }] : []),
-      { $sort: { startedAt: -1 } },
-      { $skip: (page - 1) * limit },
-      { $limit: limit },
+      // _id as tie-breaker so pages don't overlap when two trips start at the same time
+      { $sort: { startedAt: -1, _id: -1 } },
+      {
+        $facet: {
+          trips: [{ $skip: (page - 1) * limit }, { $limit: limit }],
+          total: [{ $count: 'count' }],
+        },
+      },
     ]);
+
+    return { trips: result.trips, total: result.total[0]?.count ?? 0 };
   }
 
   //---------------------------------------------------------------
@@ -97,53 +104,30 @@ export class TripsRepository extends BaseRepository<Trip> {
   //---------------------------------------------------------------
   //---------- used by the Trip Report Dashboard's ----------------
 
-  // Trip Report Dashboard: Returns the trip's motion signals: steeringWheelAngle, tripSpeeds, accelerations, tripSpeedLimits and tripAccelerations.
-  async findSpeedMotionGraph(tripId: string | Types.ObjectId) {
+  // Trip Report Dashboard: Returns the trip's motion signals: steeringWheelAngle, tripSpeeds and tripAccelerations.
+  async findTelemetry(tripId: string | Types.ObjectId) {
     const trip = await this.tripModel
       .findById(tripId)
-      .select('tripSpeeds  -_id')
-      .lean<Pick<Trip, 'tripSpeeds'>>()
+      .select('tripSpeeds tripAccelerations steeringWheelAngle -_id')
+      .lean<Pick<Trip, 'tripSpeeds' | 'tripAccelerations' | 'steeringWheelAngle'>>()
       .exec();
     if (!trip) throw new NotFoundException(`Trip ${tripId} not found`);
 
     return {
       speeds: trip.tripSpeeds ?? [],
-    };
-  }
-
-  async findAccelerationMotionGraph(tripId: string | Types.ObjectId) {
-    const trip = await this.tripModel
-      .findById(tripId)
-      .select('tripAccelerations  -_id')
-      .lean<Pick<Trip, 'tripAccelerations'>>()
-      .exec();
-    if (!trip) throw new NotFoundException(`Trip ${tripId} not found`);
-
-    return {
       accelerations: trip.tripAccelerations ?? [],
-    };
-  }
-
-  async findSteeringMotionGraph(tripId: string | Types.ObjectId) {
-    const trip = await this.tripModel
-      .findById(tripId)
-      .select('steeringWheelAngle  -_id')
-      .lean<Pick<Trip, 'steeringWheelAngle'>>()
-      .exec();
-    if (!trip) throw new NotFoundException(`Trip ${tripId} not found`);
-
-    return {
       steerings: trip.steeringWheelAngle ?? [],
     };
   }
 
-  // Returns Trip Report Dashboard header fields: startedAt, durationSeconds, vehicle and driver.fullName.
-  findDashboardHeader(tripId: string | Types.ObjectId): Promise<DashboardHeaderRow | null> {
+  // A single trip's stats plus its driver's name.
+  // lean() drops the `risk` virtual, so the service derives it from score.
+  findByIdWithDriver(tripId: string | Types.ObjectId) {
     return this.tripModel
       .findById(tripId)
-      .select('startedAt durationSeconds vehicle driver -_id')
-      .populate({ path: 'driver', select: 'fullName -_id' })
-      .lean<DashboardHeaderRow>()
+      .select('startedAt durationSeconds vehicle distanceKm averageSpeedKmh topSpeedKmh eventsCount score driver -_id')
+      .populate<{ driver: Pick<User, 'fullName'> | null }>({ path: 'driver', select: 'fullName -_id' })
+      .lean()
       .exec();
   }
 
@@ -183,7 +167,7 @@ export class TripsRepository extends BaseRepository<Trip> {
           },
         },
         { $sort: { startedAt: 1 } }, // oldest first
-        { $limit: lastN }, // keep only the newest N trips
+        { $limit: lastN }, // keep only the oldest N trips
         {
           $group: {
             _id: null,
@@ -228,9 +212,9 @@ export class TripsRepository extends BaseRepository<Trip> {
 
   // Used in the graph of the My Progress Dashboard AND graph of the main Dashboard
   async progressGraph(driverId: string | Types.ObjectId) {
-    return this.tripModel.aggregate([
+    return this.tripModel.aggregate<{ trips: { date: Date; score: number }[] }>([
       { $match: { driver: new Types.ObjectId(driverId), status: TripStatus.COMPLETED, score: { $ne: null } } },
-      { $sort: { date: -1 } },
+      { $sort: { startedAt: 1 } }, // oldest first, so the graph reads left to right
       {
         $group: {
           _id: null,

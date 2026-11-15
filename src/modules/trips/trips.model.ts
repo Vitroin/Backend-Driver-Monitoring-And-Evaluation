@@ -4,7 +4,7 @@ import { Organization } from '@modules/organizations/organization.model';
 import { User } from '@modules/users/user.model';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
-import { riskForScore } from './trip-scoring';
+import { riskForScore } from './helpers/trip-scoring';
 
 export type TripDocument = HydratedDocument<Trip>;
 
@@ -25,10 +25,6 @@ export class TripSteerings {
   time: string;
   steeringWheelAngle: number;
 }
-
-// Score thresholds for the risk badge (the "Low risk" / "High risk" lines on the score history chart)
-const LOW_RISK_MIN_SCORE = 85;
-const MEDIUM_RISK_MIN_SCORE = 65;
 
 /*
  * One drive by one driver. Measurements and the score stay null until the trip has been processed,
@@ -106,8 +102,6 @@ export class Trip {
 
   @Prop({ type: TripAcclerations, default: [] })
   tripAccelerations?: TripAcclerations[];
-
-
 }
 
 export const TripSchema = SchemaFactory.createForClass(Trip);

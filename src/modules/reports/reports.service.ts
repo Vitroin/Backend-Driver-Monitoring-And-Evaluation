@@ -190,7 +190,9 @@ export class ReportsService {
       {
         data: { total: totalIncidents, byType: incidents },
       },
-      recentTrips,
+      {
+        data: { trips: recentTrips },
+      },
       recommendations,
     ] = await Promise.all([
       this.tripsService.averageLongTermScore(driverId),

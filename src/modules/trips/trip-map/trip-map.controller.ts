@@ -12,7 +12,7 @@ import {
   type IncidentMarkerDto,
   type TripMapDto,
   type TripRouteDto,
-} from './response';
+} from '../response';
 import { TripMapService } from './trip-map.service';
 import {
   tripIncidentsQuerySchema,

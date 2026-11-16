@@ -6,7 +6,7 @@
  *   bun run seed          # nest build && node dist/database/scripts/seed.js
  *   bun run seed:fresh    # same, with --fresh (replaces previously seeded data)
  *
- * Seeds: organizations, users (instructors, analysts, drivers), trips, incidents.
+ * Seeds: organizations, users (instructors, analysts, drivers), supervisions, trips, incidents.
  * The super admin is not seeded here — use `bun run seed:super-admin`.
  *
  * Every record that points at another one carries the id its parent is inserted with: all ids are worked
@@ -22,6 +22,7 @@ import { roundToOneDecimal } from '@modules/trips/helpers/trip-scoring';
 import { IncidentType, TripStatus, UserRole } from '@common/enums';
 import {
   assertCanSeed,
+  mkSupervision,
   assertNoForeignMembers,
   bootstrap,
   fallbackLocation,
@@ -37,6 +38,7 @@ import {
   seededId,
   seedFaker,
   SeedScope,
+  SeedSupervision,
   SeedUser,
 } from '../seed/seed-kit';
 
@@ -74,10 +76,7 @@ function buildPlan(passwordHash: string) {
   // ---------------- Users ----------------
   const instructors = Array.from({ length: CONFIG.instructors }, (_, i) => {
     const email = `instructor${i + 1}@${CONFIG.emailDomain}`;
-    return {
-      ...mkUser(UserRole.DRIVER_INSTRUCTOR, email.split('@')[0], email, school._id, passwordHash),
-      drivingStudents: [] as Types.ObjectId[],
-    };
+    return mkUser(UserRole.DRIVER_INSTRUCTOR, email.split('@')[0], email, school._id, passwordHash);
   });
   const analysts = Array.from({ length: CONFIG.analysts }, (_, i) => {
     const email = `analyst${i + 1}@${CONFIG.emailDomain}`;
@@ -88,7 +87,10 @@ function buildPlan(passwordHash: string) {
   school.organizationOwner = instructors[0]._id;
   fleet.organizationOwner = analysts[0]._id;
 
-  // half the drivers are learners (driving school, taught by an instructor), half are employees (fleet)
+  // half the drivers are learners (driving school, taught by an instructor), half are employees (fleet,
+  // supervised by an analyst). Each supervisor is from the driver's own organization.
+  const supervisions: SeedSupervision[] = [];
+  let fleetDriverCount = 0;
   const drivers: SeedUser[] = Array.from({ length: CONFIG.drivers }, (_, i) => {
     const isLearner = i % 2 === 0;
     const email = `driver${i + 1}@${CONFIG.emailDomain}`;
@@ -99,8 +101,12 @@ function buildPlan(passwordHash: string) {
       isLearner ? school._id : fleet._id,
       passwordHash,
     );
-    // an instructor of the learner's own organization, so the student link stays inside the school
-    if (isLearner) faker.helpers.arrayElement(instructors).drivingStudents.push(driver._id);
+    // the learner's instructor is still picked with faker, so the rest of the faker sequence (trips, scores) is unchanged;
+    // fleet drivers are shared out between the analysts in turn, without faker for the same reason
+    const supervisor = isLearner
+      ? faker.helpers.arrayElement(instructors)
+      : analysts[fleetDriverCount++ % analysts.length];
+    supervisions.push(mkSupervision(supervisor, driver));
     return driver;
   });
 
@@ -192,7 +198,7 @@ function buildPlan(passwordHash: string) {
     trips: trips.map((trip) => trip._id as Types.ObjectId),
     incidents: incidents.map((incident) => incident._id as Types.ObjectId),
   };
-  return { organizations, users, instructors, trips, incidents, scope };
+  return { organizations, users, instructors, supervisions, trips, incidents, scope };
 }
 
 // ---------------------------------------------------------------------------
@@ -219,7 +225,8 @@ async function seed() {
     await assertNoForeignMembers(models, existing);
 
     const { removed } = await runSeedTransaction(context, { fresh, existing, seeded: plan.scope }, async () => {
-      await insertOrganizationsAndUsers(models, plan); // organizations, then users, then owners
+      // organizations, then users, then supervisions, then owners
+      await insertOrganizationsAndUsers(models, { ...plan, users: [...plan.users, ...plan.instructors] });
       await models.trip.insertMany(plan.trips); // then trips, which point at both
       await models.incident.insertMany(plan.incidents); // then incidents, which point at trips and drivers
     });
@@ -231,6 +238,7 @@ async function seed() {
     console.table({
       organizations: plan.organizations.length,
       users: plan.users.length + plan.instructors.length,
+      supervisions: plan.supervisions.length,
       trips: plan.trips.length,
       incidents: plan.incidents.length,
     });

@@ -4,7 +4,9 @@
  *
  *   users.organization            → organizations           (every role but super_admin needs one)
  *   organizations.owner           → users, a member of that organization, with the OWNER_ROLES role (warning)
- *   instructors.drivingStudents   → users: drivers of the instructor's organization
+ *   supervisions.organization     → organizations
+ *   supervisions.driver           → users: a driver of the supervision's organization
+ *   supervisions.supervisor       → users: in that organization, with the EMPLOYEE_ROLES role for its type
  *   trips.driver                  → users: a driver
  *   trips.organization            → organizations: the driver's organization
  *   incidents.trip / .driver      → trips / users: the trip's driver, on a completed trip
@@ -16,7 +18,7 @@
 
 import type { Model, PipelineStage, Types } from 'mongoose';
 import { TripStatus, UserRole } from '@common/enums';
-import { OWNER_ROLES } from '@modules/organizations/organizations.enum';
+import { EMPLOYEE_ROLES, OWNER_ROLES } from '@modules/organizations/organizations.enum';
 import type { SeedModels, SeedScope } from './seed-kit';
 
 export interface IntegrityProblem {
@@ -52,17 +54,35 @@ export async function verifyIntegrity(models: SeedModels, scope?: SeedScope): Pr
     organizations: models.organization.collection.collectionName,
     trips: models.trip.collection.collectionName,
     incidents: models.incident.collection.collectionName,
+    supervisions: models.supervision.collection.collectionName,
   };
   // With a scope, start from the scope's records only
   const only = (field: string, ids: (s: SeedScope) => Types.ObjectId[]): PipelineStage[] =>
     scope ? [{ $match: { [field]: { $in: ids(scope) } } }] : [];
 
-  const ownerRole = {
+  // The role a type maps to, read from the organization at `typeField`
+  const roleFor = (roles: Record<string, UserRole>, typeField: string) => ({
     $switch: {
-      branches: Object.entries(OWNER_ROLES).map(([type, role]) => ({ case: { $eq: ['$organizationType', type] }, then: role })),
+      branches: Object.entries(roles).map(([type, role]) => ({ case: { $eq: [typeField, type] }, then: role })),
       default: null,
     },
-  };
+  });
+  const ownerRole = roleFor(OWNER_ROLES, '$organizationType');
+
+  // A seed's supervisions: those in its organizations or between its users
+  const onlySupervisions: PipelineStage[] = scope
+    ? [
+        {
+          $match: {
+            $or: [
+              { organization: { $in: scope.organizations } },
+              { supervisor: { $in: scope.users } },
+              { driver: { $in: scope.users } },
+            ],
+          },
+        },
+      ]
+    : [];
 
   const checks: Check[] = [
     // ---------------- users ----------------
@@ -119,22 +139,41 @@ export async function verifyIntegrity(models: SeedModels, scope?: SeedScope): Pr
       ],
     },
 
-    // ---------------- instructors ----------------
+    // ---------------- supervisions ----------------
     {
-      check: "instructors.drivingStudents → drivers of the instructor's organization",
+      check: 'supervisions.organization → organizations',
       level: 'error',
-      // the discriminator model only reads instructors
-      model: models.instructor,
+      model: models.supervision,
+      pipeline: [...onlySupervisions, ...lookupOne(collections.organizations, 'organization', 'org'), { $match: { org: null } }],
+    },
+    {
+      check: "supervisions.driver → a driver of the supervision's organization",
+      level: 'error',
+      model: models.supervision,
       pipeline: [
-        ...only('_id', (s) => s.users),
-        { $unwind: '$drivingStudents' },
-        ...lookupOne(collections.users, 'drivingStudents', 'student'),
+        ...onlySupervisions,
+        ...lookupOne(collections.users, 'driver', 'd'),
+        {
+          $match: {
+            $or: [{ d: null }, { 'd.role': { $ne: UserRole.DRIVER } }, { $expr: { $ne: ['$d.organization', '$organization'] } }],
+          },
+        },
+      ],
+    },
+    {
+      check: "supervisions.supervisor → the EMPLOYEE_ROLES role of the supervision's organization",
+      level: 'error',
+      model: models.supervision,
+      pipeline: [
+        ...onlySupervisions,
+        ...lookupOne(collections.users, 'supervisor', 's'),
+        ...lookupOne(collections.organizations, 'organization', 'org'),
         {
           $match: {
             $or: [
-              { student: null },
-              { 'student.role': { $ne: UserRole.DRIVER } },
-              { $expr: { $ne: ['$student.organization', '$organization'] } },
+              { s: null },
+              { $expr: { $ne: ['$s.organization', '$organization'] } },
+              { $expr: { $ne: ['$s.role', roleFor(EMPLOYEE_ROLES, '$org.organizationType')] } },
             ],
           },
         },

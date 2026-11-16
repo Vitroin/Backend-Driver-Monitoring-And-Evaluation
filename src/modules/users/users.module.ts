@@ -5,8 +5,6 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from './user.model';
 import { UsersRepository } from './users.repository';
 import { UsersFactory } from './users.factory';
-import { UserRole } from '@common/enums';
-import { Instructor, InstructorSchema } from '@modules/instructors/instructors.model';
 
 @Module({
   imports: [
@@ -14,7 +12,6 @@ import { Instructor, InstructorSchema } from '@modules/instructors/instructors.m
       {
         name: User.name,
         schema: UserSchema,
-        discriminators: [{ name: Instructor.name, schema: InstructorSchema, value: UserRole.DRIVER_INSTRUCTOR }],
       },
     ]),
   ],

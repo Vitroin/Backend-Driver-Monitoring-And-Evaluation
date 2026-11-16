@@ -21,7 +21,6 @@ import { Faker, en, faker } from '@faker-js/faker';
 import { Model, Types } from 'mongoose';
 import { IncidentSeverity, Language, UserGender, UserRole, UserStatus } from '@common/enums';
 import { User } from '@modules/users/user.model';
-import { Instructor } from '@modules/instructors/instructors.model';
 import { Organization } from '@modules/organizations/organization.model';
 import { OrganizationTypes } from '@modules/organizations/organizations.enum';
 import { Trip } from '@modules/trips/trips.model';
@@ -30,6 +29,7 @@ import { roundToOneDecimal } from '@modules/trips/helpers/trip-scoring';
 import { Incident } from '@modules/incidents/incidents.model';
 import { Notification } from '@modules/notifications/notifications.model';
 import { RefreshToken } from '@modules/auth/token/refresh/token.model';
+import { Supervision } from '@modules/supervision/supervision.model';
 import { TransactionService } from '@shared/modules/transactions/transactions.service';
 import { AppModule } from '../../app.module';
 import { assertIntact } from './integrity';
@@ -39,13 +39,13 @@ import { assertIntact } from './integrity';
 // ---------------------------------------------------------------------------
 export interface SeedModels {
   user: Model<User>;
-  instructor: Model<Instructor>;
   organization: Model<Organization>;
   trip: Model<Trip>;
   routePoint: Model<TripRoutePoint>;
   incident: Model<Incident>;
   notification: Model<Notification>;
   refreshToken: Model<RefreshToken>;
+  supervision: Model<Supervision>;
 }
 
 export interface SeedContext {
@@ -62,13 +62,13 @@ export async function bootstrap({ allowProduction = false } = {}): Promise<SeedC
   const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error', 'warn'] });
   const models: SeedModels = {
     user: app.get(getModelToken(User.name)),
-    instructor: app.get(getModelToken(Instructor.name)),
     organization: app.get(getModelToken(Organization.name)),
     trip: app.get(getModelToken(Trip.name)),
     routePoint: app.get(getModelToken(TripRoutePoint.name)),
     incident: app.get(getModelToken(Incident.name)),
     notification: app.get(getModelToken('Notification')),
     refreshToken: app.get(getModelToken(RefreshToken.name)),
+    supervision: app.get(getModelToken(Supervision.name)),
   };
 
   // Collections and indexes have to exist before a transaction starts: creating them inside one
@@ -198,6 +198,28 @@ export const mkOrganization = (name: string, organizationType: OrganizationTypes
   organizationOwner: null,
 });
 
+export interface SeedSupervision {
+  _id: Types.ObjectId;
+  organization: Types.ObjectId;
+  supervisor: Types.ObjectId;
+  driver: Types.ObjectId;
+}
+
+/**
+ * A driver assigned to a supervisor (instructor / fleet analyst / insurance analyst) of the driver's organization,
+ * the way SupervisionService.assign does. The id comes from the pair, which the unique index allows only once.
+ */
+export const mkSupervision = (supervisor: SeedUser, driver: SeedUser): SeedSupervision => ({
+  _id: seededId(`supervision:${supervisor.email}:${driver.email}`),
+  organization: driver.organization,
+  supervisor: supervisor._id,
+  driver: driver._id,
+});
+
+/** Shares drivers out between supervisors in turn, so each supervisor gets some. */
+export const assignInTurn = (supervisors: SeedUser[], drivers: SeedUser[]): SeedSupervision[] =>
+  supervisors.length ? drivers.map((driver, i) => mkSupervision(supervisors[i % supervisors.length], driver)) : [];
+
 // ---------------------------------------------------------------------------
 // What a seed owns
 // ---------------------------------------------------------------------------
@@ -312,13 +334,12 @@ export async function deleteSeeded(models: SeedModels, scope: SeedScope) {
     routePoints: (await models.routePoint.deleteMany({ trip: { $in: trips } })).deletedCount,
     trips: (await models.trip.deleteMany({ _id: { $in: trips } })).deletedCount,
     refreshTokens: (await models.refreshToken.deleteMany({ userId: { $in: users } })).deletedCount,
-    // other instructors may have been given seeded drivers as students (assignStudent)
-    studentLinks: (
-      await models.instructor.updateMany(
-        { _id: { $nin: users }, drivingStudents: { $in: users } },
-        { $pull: { drivingStudents: { $in: users } } },
-      )
-    ).modifiedCount,
+    // also the ones real supervisors were given for seeded drivers, and the ones inside seeded organizations
+    supervisions: (
+      await models.supervision.deleteMany({
+        $or: [{ organization: { $in: organizations } }, { supervisor: { $in: users } }, { driver: { $in: users } }],
+      })
+    ).deletedCount,
     users: (await models.user.deleteMany({ _id: { $in: users } })).deletedCount,
     organizations: (await models.organization.deleteMany({ _id: { $in: organizations } })).deletedCount,
   };
@@ -335,15 +356,15 @@ export async function insertOrganizationsAndUsers(
   data: {
     organizations: SeedOrganization[];
     users: SeedUser[];
-    instructors: (SeedUser & { drivingStudents: Types.ObjectId[] })[];
+    supervisions?: SeedSupervision[];
   },
 ) {
   await models.organization.insertMany(
     data.organizations.map((organization) => ({ ...organization, organizationOwner: null })),
   );
   if (data.users.length) await models.user.insertMany(data.users);
-  // through the discriminator model so the instructor-only field (drivingStudents) is kept
-  if (data.instructors.length) await models.instructor.insertMany(data.instructors);
+  // after the users, since a supervision points at two of them
+  if (data.supervisions?.length) await models.supervision.insertMany(data.supervisions);
   for (const organization of data.organizations) {
     if (!organization.organizationOwner) continue;
     await models.organization.updateOne(

@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
-import { BaseResponseSchema, CurrentUser, Public } from '@common';
+import { AllowedRoles, BaseResponseSchema, CurrentUser, Public } from '@common';
 import type { DataResponseDto, MessageResponseDto } from '@common';
 import { objectIdSchema } from '@common/types';
 import { UsersService } from './users.service';
@@ -9,7 +9,7 @@ import { fullNameResponseSchema, type FullNameResponseDto } from './response/ful
 import { UserRole } from '@common/enums';
 
 // Every route here acts on the logged in user's own account, whatever their role
-//@ApiBearerAuth()
+@ApiBearerAuth()
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -20,7 +20,7 @@ export class UsersController {
   })
   @ApiResponse({ status: 200, standardSchema: BaseResponseSchema(fullNameResponseSchema) })
   @ApiResponse({ status: 400, description: 'Invalid full name' })
-  @Patch('me/full-name')
+  @Patch('change/full-name')
   updateFullName(
     @CurrentUser('id') userId: string,
     @Body({ schema: updateFullNameSchema }) { fullName }: UpdateFullNameDto,
@@ -28,6 +28,7 @@ export class UsersController {
     return this.usersService.updateFullName(userId, fullName);
   }
 
+  //Todo A chain of events that happen that lets when the user is deleted, his data is deleted from the system to other users dynamically.
   @ApiOperation({
     summary: "Ask for the logged in user's account and data to be deleted",
     description: 'An administrator then deletes the data. Repeating the request keeps the first request date.',
@@ -53,7 +54,7 @@ export class UsersController {
     return this.usersService.showEnrolledOrganizations(userId);
   }
 
-  @Public()
+  @AllowedRoles([UserRole.SUPER_ADMIN])
   @Get('/getAllUsers')
   @ApiQuery({
     name: 'role',

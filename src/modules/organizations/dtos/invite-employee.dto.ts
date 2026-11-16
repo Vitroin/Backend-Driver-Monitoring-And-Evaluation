@@ -1,4 +1,4 @@
-import { CreateUserSchema } from '@modules/users/create-user.dto';
+import { CreateUserSchema } from '@modules/users/dto/create-user.dto';
 import { z } from 'zod';
 
 /** The employee's details, validated the same way as when creating a user. Their role comes from the organization's type (EMPLOYEE_ROLES). */

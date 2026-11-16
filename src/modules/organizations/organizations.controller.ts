@@ -8,10 +8,11 @@ import {
   employeeInvitedResponseSchema,
   organizationListResponseSchema,
 } from './response/organization.response';
-import { AllowedRoles, Public } from '@common';
+import { AllowedRoles, CurrentUser, Public } from '@common';
 import { UserRole } from '@common/enums';
 import { CreateOrganizationSchema, type CreateOrganizationDto } from './dtos/create-organization.dto';
 import { InviteEmployeeSchema, type InviteEmployeeDto } from './dtos/invite-employee.dto';
+import type { UserDocument } from '@modules/users/user.model';
 
 @Controller('organizations')
 export class OrganizationsController {
@@ -22,7 +23,7 @@ export class OrganizationsController {
     description: 'Each organization with its name, type, owner id and creation date, sorted by name.',
   })
   @ApiResponse({ status: 200, standardSchema: organizationListResponseSchema })
-  @Public()
+  @AllowedRoles([UserRole.SUPER_ADMIN])
   @Get('/getAllOrganizations')
   async getAllOrganizations() {
     return await this.organizationsService.findAllOrganizations();
@@ -46,24 +47,25 @@ export class OrganizationsController {
     return await this.organizationsService.createOrganization(dto);
   }
 
-  // @ApiBearerAuth()
-  @Public()
+  @ApiBearerAuth()
+  @AllowedRoles([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMINISTRATOR, UserRole.FLEET_MANAGER, UserRole.INSURANCE_MANAGER])
   @ApiOperation({
     summary: 'Invite an employee into an organization',
     description:
-      'Creates a new user in the organization, with a role that depends on the organization type: driver instructor for a driving school, fleet analyst for a fleet company, insurance analyst for an insurance company. The employee is emailed a link to set their password.',
+      'A super admin can invite into any organization; an owner (school administrator, fleet manager, insurance manager) only into their own. Creates a new user in the organization, with a role that depends on the organization type: driver instructor for a driving school, fleet analyst for a fleet company, insurance analyst for an insurance company. The employee is emailed a link to set their password.',
   })
   @ApiParam({ name: 'organizationId', type: String, example: '9f3175354c863c635b87ad30' })
   @ApiResponse({ status: 201, standardSchema: employeeInvitedResponseSchema })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 401, description: 'Not logged in' })
-  @ApiResponse({ status: 404, description: 'Organization not found' })
+  @ApiResponse({ status: 404, description: 'Organization not found, or not owned by the logged in user' })
   @ApiResponse({ status: 409, description: 'Email already exists' })
-  @Post('/:organizationId/inviteEmployee')
+  @Post('/:organizationId/employees')
   async inviteEmployee(
     @Param('organizationId', ParseObjectIdPipe) organizationId: Types.ObjectId,
     @Body({ schema: InviteEmployeeSchema }) dto: InviteEmployeeDto,
+    @CurrentUser() inviter: UserDocument,
   ) {
-    return await this.organizationsService.inviteEmployee(organizationId.toString(), dto);
+    return await this.organizationsService.inviteEmployee(organizationId.toString(), inviter, dto);
   }
 }

@@ -7,9 +7,9 @@ import { UsersModule } from './users/users.module';
 import { FastApiModule } from './fast-api/fast-api.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReportsModule } from './reports/reports.module';
-import { InstructorsModule } from './instructors/instructors.module';
+import { SupervisionModule } from './supervision/supervision.module';
 
-const modules = [UsersModule, OrganizationsModule, AuthModule, TripsModule, IncidentsModule, FastApiModule, NotificationsModule, ReportsModule, InstructorsModule];
+const modules = [UsersModule, OrganizationsModule, AuthModule, TripsModule, IncidentsModule, FastApiModule, NotificationsModule, ReportsModule, SupervisionModule];
 
 @Module({
   imports: modules,

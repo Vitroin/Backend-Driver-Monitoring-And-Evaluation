@@ -3,6 +3,7 @@ import { ModuleRef } from '@nestjs/core';
 import { mongo, Types } from 'mongoose';
 import { AuthService } from '@modules/auth/auth.service';
 import { UsersService } from '@modules/users/users.service';
+import type { UserDocument } from '@modules/users/user.model';
 import { TransactionService } from '@shared/modules/transactions/transactions.service';
 import { CreateOrganizationDto } from './dtos/create-organization.dto';
 import { InviteEmployeeDto } from './dtos/invite-employee.dto';
@@ -19,9 +20,12 @@ export class OrganizationsService {
     private readonly usersService: UsersService,
     private readonly transactions: TransactionService,
     private readonly authService: AuthService,
-
   ) {}
 
+  
+  findById(id: string) {
+    return this.organizationsRepository.findById(id);
+  }
 
   // Every organization except the given one, by name (the privacy page's "share with" dropdown)
   findAllExcept(organizationId: Types.ObjectId) {
@@ -61,7 +65,9 @@ export class OrganizationsService {
     const { fullName, email, age, gender, organizationType } = createOrganizationDto;
     try {
       const createdOrganization = await this.transactions.run(async () => {
-        const organization = await this.organizationsRepository.create(this.organizationsFactory.createOrganization(createOrganizationDto));
+        const organization = await this.organizationsRepository.create(
+          this.organizationsFactory.createOrganization(createOrganizationDto),
+        );
         await this.authService.inviteUser({
           fullName,
           email,
@@ -87,18 +93,22 @@ export class OrganizationsService {
   }
 
   /** Creates invites an employee into the organization */
-  async inviteEmployee(organizationId: string, dto: InviteEmployeeDto){
-    const organization = await this.organizationsRepository.findById(organizationId);
-    if(!organization) throw new NotFoundException('Organization not found');
+  async inviteEmployee(organizationId: string, inviter: UserDocument, dto: InviteEmployeeDto) {
+    const organization = await this.organizationsRepository.findOne({
+      _id: new Types.ObjectId(organizationId),
+      // a super admin can invite into any organization; an owner only into their own
+      ...(inviter.role !== UserRole.SUPER_ADMIN && { organizationOwner: inviter._id }),
+    });
+    if (!organization) throw new NotFoundException('Organization not found');
     await this.authService.inviteUser({
       ...dto,
       role: EMPLOYEE_ROLES[organization.organizationType],
-      organization: organizationId
+      organization: organizationId,
     });
     return {
       success: true,
-      message: 'Employee invited successfully'
-    }
+      message: 'Employee invited successfully',
+    };
   }
 
   //Will be used by Super_Admin to assign an owner to an organization. This is useful when the organization is created without an owner and the SuperAdmin wants to assign one later.

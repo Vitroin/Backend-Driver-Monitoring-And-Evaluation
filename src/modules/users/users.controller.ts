@@ -4,7 +4,7 @@ import { BaseResponseSchema, CurrentUser, Public } from '@common';
 import type { DataResponseDto, MessageResponseDto } from '@common';
 import { objectIdSchema } from '@common/types';
 import { UsersService } from './users.service';
-import { updateFullNameSchema, type UpdateFullNameDto } from './update-full-name.dto';
+import { updateFullNameSchema, type UpdateFullNameDto } from './dto/update-full-name.dto';
 import { fullNameResponseSchema, type FullNameResponseDto } from './response/full-name.response';
 import { UserRole } from '@common/enums';
 

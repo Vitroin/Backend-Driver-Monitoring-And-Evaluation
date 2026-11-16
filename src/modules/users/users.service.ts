@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { UsersRepository } from './users.repository';
 import { UsersFactory } from './users.factory';
 import { Types } from 'mongoose';
-import { CreateUserDto } from './create-user.dto';
+import { CreateUserDto } from './dto/create-user.dto';
 import { UserRole, UserStatus } from '@common/enums';
 import type { DataResponseDto, MessageResponseDto } from '@common';
 import type { FullNameResponseDto } from './response/full-name.response';

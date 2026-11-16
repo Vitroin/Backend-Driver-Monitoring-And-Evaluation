@@ -118,8 +118,26 @@ export class UsersService {
     return this.usersRepository.findById(id);
   }
 
+  async deactivateUser(id: string): Promise<void> {
+    const user = await this.usersRepository.deactivateUser(id);
+    if (!user) throw new NotFoundException('User not found, or is a super admin');
+  }
+
+  async reactivateUser(id: string): Promise<void> {
+    const user = await this.usersRepository.reactivateUser(id);
+    if (!user) throw new NotFoundException('No deactivated user with this id');
+  }
+
   /** Used by the guard and refresh: same as findById, kept separate so you can add a projection or cache later. */
   findForAuthentication(id: string) {
     return this.usersRepository.findById(id);
+  }
+
+  findOne(id: string, organizationId: string, role: UserRole) {
+    return this.usersRepository.findOne({
+      _id: id,
+      organization: organizationId,
+      role,
+    });
   }
 }

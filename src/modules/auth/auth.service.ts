@@ -1,4 +1,12 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException, OnModuleInit, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  OnModuleInit,
+  UnauthorizedException,
+} from '@nestjs/common';
 import * as crypto from 'node:crypto';
 import { mongo } from 'mongoose';
 import type { DataResponseDto, MessageResponseDto, RequestSession } from '@common';
@@ -48,18 +56,27 @@ export class AuthService implements OnModuleInit {
 
   async login(loginDto: LoginDto): Promise<DataResponseDto<LoginDataDto>> {
     const user = await this.usersService.findByUsername(loginDto.username);
-    const isPasswordValid = await this.hashingService.verifyPassword(user?.passwordHash ?? this.dummyPasswordHash, loginDto.password);
+    const isPasswordValid = await this.hashingService.verifyPassword(
+      user?.passwordHash ?? this.dummyPasswordHash,
+      loginDto.password,
+    );
     if (!user || !isPasswordValid) throw new UnauthorizedException('Invalid credentials');
 
     if (user.status !== UserStatus.ACTIVE) throw new ForbiddenException('Please contact system administrator');
 
     if (user.mustChangePassword) {
-      const passwordChangeToken = await this.tokenService.issueOneTimeToken(OneTimeTokenPurpose.FORCED_PASSWORD_CHANGE, user.id);
+      const passwordChangeToken = await this.tokenService.issueOneTimeToken(
+        OneTimeTokenPurpose.FORCED_PASSWORD_CHANGE,
+        user.id,
+      );
       return { message: 'Password change required', data: { passwordChangeRequired: true, passwordChangeToken } };
     }
 
     const tokens = await this.tokenService.issueTokens(user.id, user.securityStamp.toString());
-    return { message: 'Login successful', data: { passwordChangeRequired: false, tokens, user: this.authFactory.toUserResponse(user) } };
+    return {
+      message: 'Login successful',
+      data: { passwordChangeRequired: false, tokens, user: this.authFactory.toUserResponse(user) },
+    };
   }
 
   /** Exchanges a refresh token for a new token pair. The presented refresh token can't be used again. */
@@ -67,7 +84,12 @@ export class AuthService implements OnModuleInit {
     const session = await this.tokenService.findRefreshSession(refreshTokenDto.refreshToken);
 
     const user = await this.usersService.findForAuthentication(session.userId);
-    if (!user || !user.securityStamp.equals(session.securityStamp) || user.status !== UserStatus.ACTIVE || user.mustChangePassword) {
+    if (
+      !user ||
+      !user.securityStamp.equals(session.securityStamp) ||
+      user.status !== UserStatus.ACTIVE ||
+      user.mustChangePassword
+    ) {
       await this.tokenService.revokeRefreshSession(session.id);
       throw new UnauthorizedException('Refresh token is invalid. Please login again');
     }
@@ -77,7 +99,9 @@ export class AuthService implements OnModuleInit {
   }
 
   /** Sets the password of a user who logged in with `mustChangePassword`, using the token login returned. */
-  async completeForcedPasswordChange(dto: ForcedPasswordChangeDto): Promise<DataResponseDto<{ tokens: TokenPair; user: UserResponseDto }>> {
+  async completeForcedPasswordChange(
+    dto: ForcedPasswordChangeDto,
+  ): Promise<DataResponseDto<{ tokens: TokenPair; user: UserResponseDto }>> {
     const userId = await this.tokenService.consumeOneTimeToken(OneTimeTokenPurpose.FORCED_PASSWORD_CHANGE, dto.token);
     await this.replacePassword(userId, dto.newPassword);
 
@@ -183,6 +207,21 @@ export class AuthService implements OnModuleInit {
       await this.tokenService.revokeAllRefreshTokens(userId);
     });
     return { message: 'User logged out from all devices successfully' };
+  }
+
+  async deactivateUser(userId: string, adminId: string): Promise<MessageResponseDto> {
+    if (userId === adminId) throw new BadRequestException('You cannot deactivate your own account');
+
+    await this.transactions.run(async () => {
+      await this.usersService.deactivateUser(userId); // status + new stamp in one write
+      await this.tokenService.revokeAllRefreshTokens(userId);
+    });
+    return { message: 'User deactivated successfully' };
+  }
+
+  async reactivateUser(userId: string): Promise<MessageResponseDto> {
+    await this.usersService.reactivateUser(userId);
+    return { message: 'User reactivated successfully' };
   }
 
   getCurrentUser(user: UserDocument): DataResponseDto<UserResponseDto> {

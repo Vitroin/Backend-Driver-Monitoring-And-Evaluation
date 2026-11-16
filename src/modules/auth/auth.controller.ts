@@ -14,7 +14,13 @@ import {
   resetPasswordSchema,
   validateResetPasswordOtpSchema,
 } from './dtos';
-import { changePasswordDataSchema, LoginDataDto, loginDataSchema, UserResponseDto, userResponseSchema } from './response';
+import {
+  changePasswordDataSchema,
+  LoginDataDto,
+  loginDataSchema,
+  UserResponseDto,
+  userResponseSchema,
+} from './response';
 import type {
   AcceptInvitationDto,
   ChangePasswordDto,
@@ -30,7 +36,6 @@ import { AllowedRoles, BaseResponseSchema, CurrentSession, CurrentUser, Public, 
 import type { DataResponseDto, IdParam, MessageResponseDto, RequestSession } from '@common';
 import { UserRole } from '@common/enums';
 import type { UserDocument } from '@modules/users/user.model';
-
 
 const messageResponse = BaseResponseSchema();
 
@@ -77,7 +82,9 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('refresh')
-  refresh(@Body({ schema: refreshTokenSchema }) refreshTokenDto: RefreshTokenDto): Promise<DataResponseDto<{ tokens: TokenPair }>> {
+  refresh(
+    @Body({ schema: refreshTokenSchema }) refreshTokenDto: RefreshTokenDto,
+  ): Promise<DataResponseDto<{ tokens: TokenPair }>> {
     return this.authService.refresh(refreshTokenDto);
   }
 
@@ -88,7 +95,9 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Throttle(STRICT_THROTTLE)
   @Post('forced-change-password')
-  completeForcedPasswordChange(@Body({ schema: forcedPasswordChangeSchema }) dto: ForcedPasswordChangeDto): Promise<MessageResponseDto> {
+  completeForcedPasswordChange(
+    @Body({ schema: forcedPasswordChangeSchema }) dto: ForcedPasswordChangeDto,
+  ): Promise<MessageResponseDto> {
     return this.authService.completeForcedPasswordChange(dto);
   }
 
@@ -104,7 +113,10 @@ export class AuthController {
     return this.authService.acceptInvitation(dto);
   }
 
-  @ApiOperation({ summary: 'Email a password reset link', description: 'Always returns 200, whether or not the account exists.' })
+  @ApiOperation({
+    summary: 'Email a password reset link',
+    description: 'Always returns 200, whether or not the account exists.',
+  })
   @ApiResponse({ status: 200, standardSchema: messageResponse })
   @ApiResponse({ status: 429, description: 'Too many requests from this client' })
   @Public()
@@ -115,7 +127,10 @@ export class AuthController {
     return this.authService.forgotPassword(dto);
   }
 
-  @ApiOperation({ summary: 'Set a new password using the token from a reset email', description: 'Ends every existing session of the user.' })
+  @ApiOperation({
+    summary: 'Set a new password using the token from a reset email',
+    description: 'Ends every existing session of the user.',
+  })
   @ApiResponse({ status: 200, standardSchema: messageResponse })
   @ApiResponse({ status: 401, description: 'Invalid or expired token' })
   @Public()
@@ -126,14 +141,19 @@ export class AuthController {
     return this.authService.resetPassword(dto);
   }
 
-  @ApiOperation({ summary: 'Validate a password reset OTP', description: 'Checks if the provided OTP is valid and not expired.' })
+  @ApiOperation({
+    summary: 'Validate a password reset OTP',
+    description: 'Checks if the provided OTP is valid and not expired.',
+  })
   @ApiResponse({ status: 200, standardSchema: messageResponse })
   @ApiResponse({ status: 401, description: 'Invalid or expired token' })
   @Public()
   @HttpCode(HttpStatus.OK)
   @Throttle(STRICT_THROTTLE)
   @Post('reset-password/validate')
-  validateResetPasswordOtp(@Body({ schema: validateResetPasswordOtpSchema }) dto: ValidateResetPasswordOtpDto): Promise<MessageResponseDto> {
+  validateResetPasswordOtp(
+    @Body({ schema: validateResetPasswordOtpSchema }) dto: ValidateResetPasswordOtpDto,
+  ): Promise<MessageResponseDto> {
     return this.authService.validateResetPasswordOtp(dto);
   }
 
@@ -175,5 +195,31 @@ export class AuthController {
   @Get('me')
   getCurrentUser(@CurrentUser() user: UserDocument): DataResponseDto<UserResponseDto> {
     return this.authService.getCurrentUser(user);
+  }
+
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Deactivate a user: logs them out everywhere and blocks login' })
+  @ApiResponse({ status: 200, standardSchema: messageResponse })
+  @ApiResponse({ status: 400, description: 'Tried to deactivate yourself' })
+  @ApiResponse({ status: 404, description: 'User not found, or is a super admin' })
+  @AllowedRoles([UserRole.SUPER_ADMIN])
+  @HttpCode(HttpStatus.OK)
+  @Patch('users/:id/deactivate')
+  deactivateUser(
+    @Param({ schema: idParamSchema }) { id }: IdParam,
+    @CurrentUser('id') adminId: string,
+  ): Promise<MessageResponseDto> {
+    return this.authService.deactivateUser(id, adminId);
+  }
+
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Reactivate a deactivated user so they can log in again' })
+  @ApiResponse({ status: 200, standardSchema: messageResponse })
+  @ApiResponse({ status: 404, description: 'No deactivated user with this id' })
+  @Patch('users/:id/activate')
+  @AllowedRoles([UserRole.SUPER_ADMIN])
+  @HttpCode(HttpStatus.OK)
+  reactivateUser(@Param({ schema: idParamSchema }) { id }: IdParam): Promise<MessageResponseDto> {
+    return this.authService.reactivateUser(id);
   }
 }

@@ -43,6 +43,10 @@ export class Incident {
   @Prop({ required: true })
   occurredAt: Date;
 
+  // Copied from the trip, so an organization's incidents can be queried without going through its trips
+  @Prop({ type: SchemaTypes.ObjectId, ref: 'Organization', required: true })
+  organization: Types.ObjectId;
+
   // Where the vehicle was when the event was detected; null without a GPS fix,
   // so the incident is still shown on the timeline but not placed on the map
   @Prop({ type: IncidentLocationSchema, default: null })
@@ -71,3 +75,6 @@ export const IncidentSchema = SchemaFactory.createForClass(Incident);
 
 // Driver history: a driver's incidents across trips, newest first
 IncidentSchema.index({ driver: 1, occurredAt: -1 });
+
+// An organization's / supervisor's incidents, newest first
+IncidentSchema.index({ organization: 1, occurredAt: -1 });
